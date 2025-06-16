@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система учета техники - Колледж</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ Система учета техники колледжа</h1>
+            <p>Управление и мониторинг компьютерной техники и оборудования учебного заведения</p>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalComputers">0</div>
+                    <div>Компьютеры</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalNetwork">0</div>
+                    <div>Сетевое оборудование</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalOther">0</div>
+                    <div>Другая техника</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalAssigned">0</div>
+                    <div>Персональные устройства</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Навигация по вкладкам -->
+        <div class="tab-navigation">
+            <button class="tab-button active" onclick="openTab(event, 'computers')">💻 Компьютеры</button>
+            <button class="tab-button" onclick="openTab(event, 'network')">🌐 Сетевое оборудование</button>
+            <button class="tab-button" onclick="openTab(event, 'other')">🖨️ Другая техника</button>
+            <button class="tab-button" onclick="openTab(event, 'assigned')">👤 Персональные устройства</button>
+            <!-- Тестовая кнопка для отладки -->
+            <button class="tab-button" onclick="testClick()" style="background: #ff6b6b;">🔧 Тест</button>
+        </div>
+
+        <!-- Вкладка "Компьютеры" -->
+        <div id="computers" class="tab-content active">
+            <div class="controls">
+                <input type="text" class="search-box" id="computerSearchInput" placeholder="🔍 Поиск по инвентарному номеру, модели, кабинету...">
+                <select class="filter-select" id="buildingFilter">
+                    <option value="">Все корпуса</option>
+                    <option value="главный">Главный корпус</option>
+                    <option value="медицинский">Медицинский колледж</option>
+                </select>
+                <select class="filter-select" id="typeFilter">
+                    <option value="">Все типы</option>
+                    <option value="компьютер">Компьютеры</option>
+                    <option value="ноутбук">Ноутбуки</option>
+                    <option value="нетбук">Нетбуки</option>
+                </select>
+                <select class="filter-select" id="statusFilter">
+                    <option value="">Все статусы</option>
+                    <option value="working">Исправные</option>
+                    <option value="issues">С проблемами</option>
+                    <option value="broken">Неисправные</option>
+                </select>
+                <div class="file-operations">
+                    <button class="btn btn-success" onclick="openComputerModal()">➕ Добавить</button>
+                    <input type="file" id="importComputers" class="file-input" accept=".xlsx,.xls" onchange="importComputers(event)">
+                    <label for="importComputers" class="file-label">📥 Импорт Excel</label>
+                    <button class="btn" onclick="showImportedData()" style="background: linear-gradient(45deg, #9b59b6, #8e44ad);">👁️ Импортированные</button>
+                    <button class="btn" onclick="migrateImportedData()" style="background: linear-gradient(45deg, #e67e22, #d35400);">🔄 Перенести данные</button>
+                    <button class="btn btn-warning" onclick="exportToExcel('computers')">📤 Экспорт Excel</button>
+                    <button class="btn" onclick="exportData('computers')">📊 Экспорт JSON</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Инвентарный номер</th>
+                            <th>Корпус</th>
+                            <th>Расположение</th>
+                            <th>Тип</th>
+                            <th>Модель</th>
+                            <th>Процессор</th>
+                            <th>ОЗУ</th>
+                            <th>IP-адрес</th>
+                            <th>Имя ПК</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="computerTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Вкладка "Сетевое оборудование" -->
+        <div id="network" class="tab-content">
+            <div class="controls">
+                <input type="text" class="search-box" id="networkSearchInput" placeholder="🔍 Поиск по модели, IP-адресу, расположению...">
+                <select class="filter-select" id="networkBuildingFilter">
+                    <option value="">Все корпуса</option>
+                    <option value="главный">Главный корпус</option>
+                    <option value="медицинский">Медицинский колледж</option>
+                </select>
+                <select class="filter-select" id="networkTypeFilter">
+                    <option value="">Все типы</option>
+                    <option value="роутер">Роутеры</option>
+                    <option value="свитч">Свитчи</option>
+                    <option value="точка доступа">Точки доступа</option>
+                </select>
+                <div class="file-operations">
+                    <button class="btn btn-success" onclick="openNetworkModal()">➕ Добавить</button>
+                    <button class="btn btn-warning" onclick="exportToExcel('network')">📤 Экспорт Excel</button>
+                    <button class="btn" onclick="exportData('network')">📊 Экспорт JSON</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Тип</th>
+                            <th>Модель</th>
+                            <th>Корпус</th>
+                            <th>Расположение</th>
+                            <th>IP-адрес</th>
+                            <th>Логин</th>
+                            <th>WiFi сеть</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="networkTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Вкладка "Другая техника" -->
+        <div id="other" class="tab-content">
+            <div class="controls">
+                <input type="text" class="search-box" id="otherSearchInput" placeholder="🔍 Поиск по типу, модели, расположению...">
+                <select class="filter-select" id="otherBuildingFilter">
+                    <option value="">Все корпуса</option>
+                    <option value="главный">Главный корпус</option>
+                    <option value="медицинский">Медицинский колледж</option>
+                </select>
+                <select class="filter-select" id="otherTypeFilter">
+                    <option value="">Все типы</option>
+                    <option value="принтер">Принтеры</option>
+                    <option value="проектор">Проекторы</option>
+                    <option value="монитор">Мониторы</option>
+                    <option value="сканер">Сканеры</option>
+                    <option value="другое">Другое</option>
+                </select>
+                <div class="file-operations">
+                    <button class="btn btn-success" onclick="openOtherModal()">➕ Добавить</button>
+                    <button class="btn btn-warning" onclick="exportToExcel('other')">📤 Экспорт Excel</button>
+                    <button class="btn" onclick="exportData('other')">📊 Экспорт JSON</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Тип</th>
+                            <th>Модель</th>
+                            <th>Корпус</th>
+                            <th>Расположение</th>
+                            <th>Ответственный</th>
+                            <th>Инвентарный номер</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="otherTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Вкладка "Персональные устройства" -->
+        <div id="assigned" class="tab-content">
+            <div class="controls">
+                <input type="text" class="search-box" id="assignedSearchInput" placeholder="🔍 Поиск по сотруднику, устройству...">
+                <select class="filter-select" id="assignedBuildingFilter">
+                    <option value="">Все корпуса</option>
+                    <option value="главный">Главный корпус</option>
+                    <option value="медицинский">Медицинский колледж</option>
+                </select>
+                <div class="file-operations">
+                    <button class="btn btn-success" onclick="openAssignedModal()">➕ Назначить устройство</button>
+                    <button class="btn btn-warning" onclick="exportToExcel('assigned')">📤 Экспорт Excel</button>
+                    <button class="btn" onclick="exportData('assigned')">📊 Экспорт JSON</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Сотрудник</th>
+                            <th>Должность</th>
+                            <th>Корпус</th>
+                            <th>Устройства</th>
+                            <th>Дата назначения</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assignedTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <!-- Модальное окно для компьютеров -->
+    <div id="computerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('computerModal')">&times;</span>
+            <h2 id="computerModalTitle">Добавить компьютер</h2>
+            
+            <!-- Поиск по инвентарному номеру -->
+            <div class="inventory-search" id="inventorySearchBox">
+                <input type="text" id="inventorySearchInput" placeholder="Введите инвентарный номер для автозаполнения..." 
+                       style="flex: 2; margin-right: 10px;">
+                <button type="button" class="btn" onclick="searchByInventoryNumber()" style="margin-right: 10px;">🔍 Найти</button>
+                <div class="auto-fill-info" id="autoFillInfo">
+                    Введите инвентарный номер и нажмите "Найти" для автоматического заполнения полей
+                </div>
+            </div>
+            
+            <form id="computerForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="computerInventoryNumber">Инвентарный номер:</label>
+                        <input type="text" id="computerInventoryNumber" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="computerBuilding">Корпус:</label>
+                        <select id="computerBuilding" required>
+                            <option value="">Выберите корпус</option>
+                            <option value="главный">Главный корпус</option>
+                            <option value="медицинский">Медицинский колледж</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="computerLocation">Расположение (кабинет):</label>
+                        <input type="text" id="computerLocation" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="computerDeviceType">Тип устройства:</label>
+                        <select id="computerDeviceType" required>
+                            <option value="">Выберите тип</option>
+                            <option value="компьютер">Компьютер</option>
+                            <option value="ноутбук">Ноутбук</option>
+                            <option value="нетбук">Нетбук</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="computerModel">Модель:</label>
+                        <input type="text" id="computerModel">
+                    </div>
+                    <div class="form-group">
+                        <label for="computerProcessor">Процессор:</label>
+                        <input type="text" id="computerProcessor">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="computerRam">ОЗУ:</label>
+                        <input type="text" id="computerRam">
+                    </div>
+                    <div class="form-group">
+                        <label for="computerStorage">Накопитель:</label>
+                        <input type="text" id="computerStorage">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="computerGraphics">Видеокарта:</label>
+                        <input type="text" id="computerGraphics">
+                    </div>
+                    <div class="form-group">
+                        <label for="computerIpAddress">IP-адрес:</label>
+                        <input type="text" id="computerIpAddress">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="computerName">Имя компьютера:</label>
+                        <input type="text" id="computerName">
+                    </div>
+                    <div class="form-group">
+                        <label for="computerYear">Год приобретения:</label>
+                        <input type="text" id="computerYear">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="computerNotes">Особенности/Проблемы:</label>
+                    <textarea id="computerNotes" rows="3"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-success">💾 Сохранить</button>
+                    <button type="button" class="btn" onclick="closeModal('computerModal')">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно для сетевого оборудования -->
+    <div id="networkModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('networkModal')">&times;</span>
+            <h2 id="networkModalTitle">Добавить сетевое устройство</h2>
+            <form id="networkForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="networkType">Тип устройства:</label>
+                        <select id="networkType" required>
+                            <option value="">Выберите тип</option>
+                            <option value="роутер">Роутер</option>
+                            <option value="свитч">Свитч</option>
+                            <option value="точка доступа">Точка доступа</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="networkModel">Модель:</label>
+                        <input type="text" id="networkModel" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="networkBuilding">Корпус:</label>
+                        <select id="networkBuilding" required>
+                            <option value="">Выберите корпус</option>
+                            <option value="главный">Главный корпус</option>
+                            <option value="медицинский">Медицинский колледж</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="networkLocation">Расположение:</label>
+                        <input type="text" id="networkLocation" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="networkIpAddress">IP-адрес:</label>
+                        <input type="text" id="networkIpAddress" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="networkLogin">Логин веб-интерфейса:</label>
+                        <input type="text" id="networkLogin">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="networkPassword">Пароль веб-интерфейса:</label>
+                        <input type="password" id="networkPassword">
+                    </div>
+                    <div class="form-group">
+                        <label for="networkWifiName">Название WiFi сети:</label>
+                        <input type="text" id="networkWifiName">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="networkWifiPassword">Пароль WiFi:</label>
+                        <input type="password" id="networkWifiPassword">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="networkNotes">Примечания:</label>
+                    <textarea id="networkNotes" rows="3"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-success">💾 Сохранить</button>
+                    <button type="button" class="btn" onclick="closeModal('networkModal')">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно для другой техники -->
+    <div id="otherModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('otherModal')">&times;</span>
+            <h2 id="otherModalTitle">Добавить устройство</h2>
+            <form id="otherForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="otherType">Тип устройства:</label>
+                        <select id="otherType" required>
+                            <option value="">Выберите тип</option>
+                            <option value="принтер">Принтер</option>
+                            <option value="проектор">Проектор</option>
+                            <option value="монитор">Монитор</option>
+                            <option value="сканер">Сканер</option>
+                            <option value="другое">Другое</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="otherModel">Модель:</label>
+                        <input type="text" id="otherModel" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="otherBuilding">Корпус:</label>
+                        <select id="otherBuilding" required>
+                            <option value="">Выберите корпус</option>
+                            <option value="главный">Главный корпус</option>
+                            <option value="медицинский">Медицинский колледж</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="otherLocation">Расположение:</label>
+                        <input type="text" id="otherLocation" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="otherResponsible">Ответственный:</label>
+                        <input type="text" id="otherResponsible">
+                    </div>
+                    <div class="form-group">
+                        <label for="otherInventoryNumber">Инвентарный номер:</label>
+                        <input type="text" id="otherInventoryNumber">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="otherNotes">Примечания:</label>
+                    <textarea id="otherNotes" rows="3"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-success">💾 Сохранить</button>
+                    <button type="button" class="btn" onclick="closeModal('otherModal')">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно для назначения устройств -->
+    <div id="assignedModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('assignedModal')">&times;</span>
+            <h2 id="assignedModalTitle">Назначить устройство сотруднику</h2>
+            
+            <!-- Поиск устройства по инвентарному номеру -->
+            <div class="inventory-search" id="deviceSearchBox">
+                <input type="text" id="deviceSearchInput" placeholder="Введите инвентарный номер устройства..." 
+                       style="flex: 2; margin-right: 10px;">
+                <button type="button" class="btn" onclick="searchDeviceByInventoryNumber()" style="margin-right: 10px;">🔍 Найти устройство</button>
+                <div class="auto-fill-info" id="deviceAutoFillInfo">
+                    Поиск устройства по инвентарному номеру для быстрого добавления
+                </div>
+            </div>
+            
+            <form id="assignedForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="assignedEmployee">ФИО сотрудника:</label>
+                        <input type="text" id="assignedEmployee" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="assignedPosition">Должность:</label>
+                        <input type="text" id="assignedPosition" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="assignedBuilding">Корпус:</label>
+                        <select id="assignedBuilding" required>
+                            <option value="">Выберите корпус</option>
+                            <option value="главный">Главный корпус</option>
+                            <option value="медицинский">Медицинский колледж</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assignedDate">Дата назначения:</label>
+                        <input type="date" id="assignedDate" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="assignedDevices">Назначенные устройства (по одному на строку):</label>
+                    <textarea id="assignedDevices" rows="4" placeholder="Например:&#10;Ноутбук Samsung np-n100 (0100115)&#10;Принтер HP LaserJet P1102" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="assignedNotes">Примечания:</label>
+                    <textarea id="assignedNotes" rows="2"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-success">💾 Сохранить</button>
+                    <button type="button" class="btn" onclick="closeModal('assignedModal')">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="database.js"></script>
+    <script src="utils.js"></script>
+    <script src="script.js"></script>
+    
+    <!-- Отладочный скрипт для проверки загрузки -->
+    <script>
+        // Проверяем, что все функции загружены
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM загружен');
+            console.log('Доступные глобальные функции:', {
+                openTab: typeof window.openTab,
+                openComputerModal: typeof window.openComputerModal,
+                db: typeof window.db,
+                NotificationManager: typeof window.NotificationManager
+            });
+            
+            // Если функции не загружены, выводим ошибку
+            if (typeof window.openTab === 'undefined') {
+                console.error('Ошибка: функции из script.js не загружены!');
+                alert('Ошибка загрузки скриптов. Обновите страницу.');
+            }
+        });
+        
+        // Тестовая функция для проверки кликов
+        function testClick() {
+            console.log('Тестовая кнопка работает!');
+            alert('Тестовая кнопка работает!');
+        }
+    </script>
+</body>
+</html>
