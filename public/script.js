@@ -125,6 +125,9 @@ async function renderTabContent(tabName) {
             case 'ipaddresses':
                 await renderIPAddressTable();
                 break;
+            case 'history':
+                await renderHistory();
+                break;
             default:
                 console.warn('Неизвестная вкладка:', tabName);
         }
@@ -245,6 +248,7 @@ function openComputerModal() {
         if (form) {
             form.reset();
         }
+        document.getElementById('computerStatus').value = 'working';
         
         // Сбрасываем состояние поиска
         resetInventorySearch();
@@ -286,6 +290,7 @@ async function editComputer(id) {
         document.getElementById('computerName').value = computer.computerName || '';
         document.getElementById('computerYear').value = computer.year || '';
         document.getElementById('computerNotes').value = computer.notes || '';
+        document.getElementById('computerStatus').value = computer.status || 'working';
 
         resetInventorySearch();
         document.getElementById('computerModal').style.display = 'block';
@@ -406,6 +411,7 @@ function openNetworkModal() {
         if (form) {
             form.reset();
         }
+        document.getElementById('networkStatus').value = 'working';
         
         document.getElementById('networkModal').style.display = 'block';
     } catch (error) {
@@ -441,6 +447,7 @@ async function editNetworkDevice(id) {
         document.getElementById('networkWifiName').value = device.wifiName || '';
         document.getElementById('networkWifiPassword').value = device.wifiPassword || '';
         document.getElementById('networkNotes').value = device.notes || '';
+        document.getElementById('networkStatus').value = device.status || 'working';
 
         document.getElementById('networkModal').style.display = 'block';
     } catch (error) {
@@ -560,6 +567,7 @@ function openOtherModal() {
         if (form) {
             form.reset();
         }
+        document.getElementById('otherStatus').value = 'working';
         
         document.getElementById('otherModal').style.display = 'block';
     } catch (error) {
@@ -592,6 +600,7 @@ async function editOtherDevice(id) {
         document.getElementById('otherResponsible').value = device.responsible || '';
         document.getElementById('otherInventoryNumber').value = device.inventoryNumber || '';
         document.getElementById('otherNotes').value = device.notes || '';
+        document.getElementById('otherStatus').value = device.status || 'working';
 
         document.getElementById('otherModal').style.display = 'block';
     } catch (error) {
@@ -792,7 +801,7 @@ async function renderIPAddressTable() {
         computers.forEach(computer => {
             if (computer.ipAddress && computer.ipAddress.startsWith('192.168.100.')) {
                 usedIPs.set(computer.ipAddress, {
-                    type: 'Компьютер',
+                    type: computer.deviceType || 'Компьютер',
                     name: computer.computerName || computer.model || 'Неизвестно',
                     location: computer.location || '',
                     status: computer.status || 'working'
@@ -913,6 +922,56 @@ function assignIP(ip) {
     }
 }
 
+// === ИСТОРИЯ ИЗМЕНЕНИЙ ===
+async function renderHistory() {
+    console.log('📜 Загрузка истории изменений');
+
+    try {
+        const history = await db.getHistory();
+        const tbody = document.getElementById('historyTable');
+        if (!tbody) {
+            console.error('❌ Элемент historyTable не найден');
+            return;
+        }
+
+        tbody.innerHTML = '';
+        const actionMap = { create: 'добавлено', update: 'изменено', delete: 'удалено' };
+        const tableMap = {
+            computers: 'Компьютеры',
+            network_devices: 'Сетевое оборудование',
+            other_devices: 'Другая техника',
+            assigned_devices: 'Персональные устройства'
+        };
+
+        function formatDetails(details) {
+            if (!details) return '';
+            const before = details.before ? JSON.stringify(details.before) : '';
+            const after = details.after ? JSON.stringify(details.after) : '';
+            if (before && after) return `до: ${before}\nпосле: ${after}`;
+            return before || after;
+        }
+
+        history.forEach((item, index) => {
+            const action = actionMap[item.action] || item.action;
+            const table = tableMap[item.table] || item.table;
+            const detailsText = formatDetails(item.details);
+            tbody.innerHTML += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(table)}</td>
+                    <td>${escapeHtml(item.inventoryNumber || '')}</td>
+                    <td>${escapeHtml(item.name || '')}</td>
+                    <td>${escapeHtml(action)}</td>
+                    <td style="white-space: pre-wrap">${escapeHtml(detailsText)}</td>
+                    <td>${new Date(item.timestamp).toLocaleString()}</td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки истории:', error);
+    }
+}
+
 // === ОБРАБОТЧИКИ ФОРМ ===
 
 // Добавляем обработку формы компьютеров
@@ -935,7 +994,8 @@ async function handleComputerSubmit(e) {
             ipAddress: document.getElementById('computerIpAddress').value.trim(),
             computerName: document.getElementById('computerName').value.trim(),
             year: document.getElementById('computerYear').value.trim(),
-            notes: document.getElementById('computerNotes').value.trim()
+            notes: document.getElementById('computerNotes').value.trim(),
+            status: document.getElementById('computerStatus').value
         };
 
         console.log('📝 Данные формы:', formData);
@@ -993,7 +1053,8 @@ async function handleNetworkSubmit(e) {
             password: document.getElementById('networkPassword').value.trim(),
             wifiName: document.getElementById('networkWifiName').value.trim(),
             wifiPassword: document.getElementById('networkWifiPassword').value.trim(),
-            notes: document.getElementById('networkNotes').value.trim()
+            notes: document.getElementById('networkNotes').value.trim(),
+            status: document.getElementById('networkStatus').value
         };
 
         // Валидация
@@ -1044,7 +1105,8 @@ async function handleOtherSubmit(e) {
             location: document.getElementById('otherLocation').value.trim(),
             responsible: document.getElementById('otherResponsible').value.trim(),
             inventoryNumber: document.getElementById('otherInventoryNumber').value.trim(),
-            notes: document.getElementById('otherNotes').value.trim()
+            notes: document.getElementById('otherNotes').value.trim(),
+            status: document.getElementById('otherStatus').value
         };
 
         // Валидация
