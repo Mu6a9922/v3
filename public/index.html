@@ -40,6 +40,7 @@
             <button class="tab-button" onclick="openTab(event, 'other')">🖨️ Другая техника</button>
             <button class="tab-button" onclick="openTab(event, 'assigned')">👤 Персональные устройства</button>
             <button class="tab-button" onclick="openTab(event, 'ipaddresses')">📊 IP адреса</button>
+            <button class="tab-button" onclick="openTab(event, 'history')">🕘 История</button>
         </div>
 
         <!-- Вкладка "Компьютеры" -->
@@ -247,6 +248,29 @@
                 </table>
             </div>
         </div>
+
+        <!-- Вкладка "История" -->
+        <div id="history" class="tab-content">
+            <div class="controls">
+                <h3>🕘 История изменений</h3>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Таблица</th>
+                            <th>ID</th>
+                            <th>Действие</th>
+                            <th>Время</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Модальные окна -->
@@ -341,7 +365,12 @@
                     <textarea id="computerNotes" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label><input type="checkbox" id="computerBroken"> Неисправно</label>
+                    <label for="computerStatus">Состояние:</label>
+                    <select id="computerStatus">
+                        <option value="working">Исправен</option>
+                        <option value="issues">С проблемами</option>
+                        <option value="broken">Не исправен</option>
+                    </select>
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn btn-success">💾 Сохранить</button>
@@ -417,7 +446,12 @@
                     <textarea id="networkNotes" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label><input type="checkbox" id="networkBroken"> Неисправно</label>
+                    <label for="networkStatus">Состояние:</label>
+                    <select id="networkStatus">
+                        <option value="working">Исправен</option>
+                        <option value="issues">С проблемами</option>
+                        <option value="broken">Не исправен</option>
+                    </select>
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn btn-success">💾 Сохранить</button>
@@ -479,7 +513,12 @@
                     <textarea id="otherNotes" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label><input type="checkbox" id="otherBroken"> Неисправно</label>
+                    <label for="otherStatus">Состояние:</label>
+                    <select id="otherStatus">
+                        <option value="working">Исправен</option>
+                        <option value="issues">С проблемами</option>
+                        <option value="broken">Не исправен</option>
+                    </select>
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn btn-success">💾 Сохранить</button>
