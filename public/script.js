@@ -913,27 +913,8 @@ async function editDeviceByIP(ip) {
     }
 }
 
-        const actionMap = { create: 'добавлено', update: 'изменено', delete: 'удалено' };
-        const tableMap = {
-            computers: 'Компьютеры',
-            network_devices: 'Сетевое оборудование',
-            other_devices: 'Другая техника',
-            assigned_devices: 'Персональные устройства'
-        };
-
-        function formatDetails(details) {
-            if (!details) return '';
-            const before = details.before ? JSON.stringify(details.before) : '';
-            const after = details.after ? JSON.stringify(details.after) : '';
-            if (before && after) return `до: ${before}\nпосле: ${after}`;
-            return before || after;
-        }
-            const action = actionMap[item.action] || item.action;
-            const table = tableMap[item.table] || item.table;
-            const detailsText = formatDetails(item.details);
-                    <td>${escapeHtml(table)}</td>
-                    <td>${escapeHtml(action)}</td>
-                    <td style="white-space: pre-wrap">${escapeHtml(detailsText)}</td>
+function assignIP(ip) {
+    console.log('➕ Назначение IP адреса:', ip);
     
     // Открываем модальное окно для выбора типа устройства
     const deviceType = prompt('Выберите тип устройства:\n1 - Компьютер\n2 - Сетевое устройство\n\nВведите номер:');
@@ -952,7 +933,6 @@ async function editDeviceByIP(ip) {
         }, 100);
     }
 }
-
 // === ИСТОРИЯ ИЗМЕНЕНИЙ ===
 async function renderHistory() {
     console.log('📜 Загрузка истории изменений');
@@ -966,15 +946,202 @@ async function renderHistory() {
         }
 
         tbody.innerHTML = '';
+        const actionMap = { create: 'добавлено', update: 'изменено', delete: 'удалено' };
+        const tableMap = {
+            computers: 'Компьютеры',
+            network_devices: 'Сетевое оборудование',
+            other_devices: 'Другая техника',
+            assigned_devices: 'Персональные устройства'
+        };
+
+        function formatDetails(details) {
+            if (!details) return '';
+            
+            const beforeLabel = '<span style=" border-radius: 8px; padding: 2px 6px; background-color: rgba(0, 191, 255, 0.1); color: #0080ff; font-weight: 500;">до</span>';
+            const afterLabel = '<span style=" border-radius: 8px; padding: 2px 6px; background-color: rgba(255, 208, 0, 0.29); color: #0080ff; font-weight: 500;">после</span>';
+            
+            // Если есть только одно значение (создание или удаление)
+            if (!details.before && details.after) {
+                return `${afterLabel}: ${formatObjectForDisplay(details.after)}`;
+            }
+            if (details.before && !details.after) {
+                return `${beforeLabel}: ${formatObjectForDisplay(details.before)}`;
+            }
+            
+            // Если есть и до, и после - показываем только различия
+            if (details.before && details.after) {
+                const differences = findDifferences(details.before, details.after);
+                if (differences.length === 0) {
+                    return 'Изменений не обнаружено';
+                }
+                
+                return differences.map(diff => {
+                    if (diff.type === 'changed') {
+                        return `<strong>${diff.field}:</strong> ${beforeLabel} ${diff.before} → ${afterLabel} ${diff.after}`;
+                    } else if (diff.type === 'added') {
+                        return `<strong>${diff.field}:</strong> ${afterLabel} ${diff.after}`;
+                    } else if (diff.type === 'removed') {
+                        return `<strong>${diff.field}:</strong> ${beforeLabel} ${diff.before} (удалено)`;
+                    }
+                }).join('\n');
+            }
+            
+            return '';
+        }
+
+        // Функция для поиска различий между объектами
+        function findDifferences(before, after) {
+            const differences = [];
+            const allKeys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+            
+            // Маппинг полей для красивого отображения
+            const fieldNames = {
+                'inventoryNumber': 'Инвентарный номер',
+                'inventory_number': 'Инвентарный номер',
+                'building': 'Корпус',
+                'location': 'Расположение',
+                'deviceType': 'Тип устройства',
+                'device_type': 'Тип устройства',
+                'model': 'Модель',
+                'processor': 'Процессор',
+                'ram': 'ОЗУ',
+                'storage': 'Накопитель',
+                'graphics': 'Видеокарта',
+                'ipAddress': 'IP-адрес',
+                'ip_address': 'IP-адрес',
+                'computerName': 'Имя компьютера',
+                'computer_name': 'Имя компьютера',
+                'year': 'Год',
+                'notes': 'Примечания',
+                'status': 'Статус',
+                'type': 'Тип',
+                'login': 'Логин',
+                'password': 'Пароль',
+                'wifiName': 'WiFi сеть',
+                'wifi_name': 'WiFi сеть',
+                'wifiPassword': 'Пароль WiFi',
+                'wifi_password': 'Пароль WiFi',
+                'responsible': 'Ответственный',
+                'employee': 'Сотрудник',
+                'position': 'Должность',
+                'devices': 'Устройства',
+                'assignedDate': 'Дата назначения',
+                'assigned_date': 'Дата назначения'
+            };
+            
+            for (const key of allKeys) {
+                const beforeValue = before ? before[key] : undefined;
+                const afterValue = after ? after[key] : undefined;
+                
+                // Пропускаем служебные поля
+                if (['id', 'created_at', 'updated_at', 'imported_at'].includes(key)) {
+                    continue;
+                }
+                
+                // Нормализуем значения для сравнения
+                const normalizedBefore = normalizeValue(beforeValue);
+                const normalizedAfter = normalizeValue(afterValue);
+                
+                if (normalizedBefore !== normalizedAfter) {
+                    const fieldName = fieldNames[key] || key;
+                    
+                    if (normalizedBefore === '' && normalizedAfter !== '') {
+                        differences.push({
+                            type: 'added',
+                            field: fieldName,
+                            after: formatValue(afterValue)
+                        });
+                    } else if (normalizedBefore !== '' && normalizedAfter === '') {
+                        differences.push({
+                            type: 'removed',
+                            field: fieldName,
+                            before: formatValue(beforeValue)
+                        });
+                    } else if (normalizedBefore !== '' && normalizedAfter !== '') {
+                        differences.push({
+                            type: 'changed',
+                            field: fieldName,
+                            before: formatValue(beforeValue),
+                            after: formatValue(afterValue)
+                        });
+                    }
+                }
+            }
+            
+            return differences;
+        }
+
+        // Функция для нормализации значений для сравнения
+        function normalizeValue(value) {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'string') return value.trim();
+            if (Array.isArray(value)) return JSON.stringify(value);
+            if (typeof value === 'object') return JSON.stringify(value);
+            return String(value);
+        }
+
+        // Функция для форматирования значений для отображения
+        function formatValue(value) {
+            if (value === null || value === undefined || value === '') return 'пусто';
+            
+            // Обработка массивов (для устройств)
+            if (Array.isArray(value)) {
+                return value.join(', ');
+            }
+            
+            // Обработка объектов
+            if (typeof value === 'object') {
+                return JSON.stringify(value);
+            }
+            
+            // Обработка статусов
+            if (typeof value === 'string') {
+                const statusMap = {
+                    'working': 'Исправен',
+                    'issues': 'С проблемами',
+                    'broken': 'Неисправен'
+                };
+                
+                if (statusMap[value]) {
+                    return statusMap[value];
+                }
+            }
+            
+            return String(value);
+        }
+
+        // Функция для форматирования объекта целиком (для случаев создания/удаления)
+        function formatObjectForDisplay(obj) {
+            if (!obj || typeof obj !== 'object') return String(obj || '');
+            
+            const important = ['inventoryNumber', 'inventory_number', 'model', 'employee', 'type', 'deviceType', 'device_type'];
+            const importantField = important.find(field => obj[field]);
+            
+            if (importantField) {
+                return `${obj[importantField]}`;
+            }
+            
+            // Если нет важных полей, показываем первые доступные
+            const keys = Object.keys(obj).filter(key => !['id', 'created_at', 'updated_at'].includes(key));
+            if (keys.length > 0) {
+                return `${keys[0]}: ${obj[keys[0]]}`;
+            }
+            
+            return 'Новая запись';
+        }
 
         history.forEach((item, index) => {
+            const action = actionMap[item.action] || item.action;
+            const table = tableMap[item.table] || item.table;
+            const detailsText = formatDetails(item.details);
             tbody.innerHTML += `
                 <tr>
                     <td>${index + 1}</td>
-                    <td>${escapeHtml(item.table)}</td>
+                    <td>${escapeHtml(table)}</td>
                     <td>${escapeHtml(item.inventoryNumber || '')}</td>
                     <td>${escapeHtml(item.name || '')}</td>
-                    <td>${escapeHtml(item.action)}</td>
+                    <td>${escapeHtml(action)}</td>
+                    <td style="white-space: pre-wrap">${detailsText}</td>
                     <td>${new Date(item.timestamp).toLocaleString()}</td>
                 </tr>
             `;

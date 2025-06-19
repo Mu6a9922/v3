@@ -539,6 +539,7 @@ tr:hover {
     color: #666;
 }
 
+
 /* Адаптивность */
 @media (max-width: 1200px) {
     .container {
