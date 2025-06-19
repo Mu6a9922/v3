@@ -122,6 +122,9 @@ async function renderTabContent(tabName) {
             case 'assigned':
                 await filterAssignedDevices();
                 break;
+            case 'ipaddresses':
+                await renderIPAddressTable();
+                break;
             default:
                 console.warn('Неизвестная вкладка:', tabName);
         }
@@ -308,105 +311,611 @@ async function deleteComputer(id) {
     }
 }
 
-// === ДРУГИЕ ФУНКЦИИ ===
+// === РАБОТА С СЕТЕВЫМ ОБОРУДОВАНИЕМ ===
+
+function renderNetworkTable(data = []) {
+    console.log('🌐 Рендеринг таблицы сетевого оборудования, записей:', data.length);
+    
+    const tbody = document.getElementById('networkTable');
+    if (!tbody) {
+        console.error('❌ Элемент networkTable не найден');
+        return;
+    }
+    
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
+        return;
+    }
+
+    data.forEach((device, index) => {
+        const statusClass = StatusManager ? StatusManager.getStatusClass(device.status) : 'status-working';
+        const statusText = StatusManager ? StatusManager.getStatusText(device.status) : 'Неизвестно';
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(device.type || '')}</td>
+                <td>${escapeHtml(device.model || '')}</td>
+                <td>${escapeHtml(device.building || '')}</td>
+                <td>${escapeHtml(device.location || '')}</td>
+                <td>${escapeHtml(device.ipAddress || '')}</td>
+                <td>${escapeHtml(device.login || '')}</td>
+                <td>${escapeHtml(device.wifiName || '')}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>
+                    <button class="btn" onclick="editNetworkDevice(${device.id})" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>
+                    <button class="btn btn-danger" onclick="deleteNetworkDevice(${device.id})" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;" title="Удалить">🗑️</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function filterNetworkDevices() {
+    console.log('🌐 Фильтрация сетевых устройств');
+    
+    try {
+        const searchTerm = document.getElementById('networkSearchInput')?.value || '';
+        const buildingFilter = document.getElementById('networkBuildingFilter')?.value || '';
+        const typeFilter = document.getElementById('networkTypeFilter')?.value || '';
+
+        let devices = await db.getByType('networkDevices');
+
+        // Поиск
+        if (searchTerm) {
+            devices = devices.filter(device => {
+                const searchFields = [
+                    device.model || '',
+                    device.ipAddress || '',
+                    device.location || '',
+                    device.wifiName || ''
+                ];
+                return searchFields.some(field => 
+                    field.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            });
+        }
+
+        // Фильтры
+        if (buildingFilter) {
+            devices = devices.filter(d => d.building === buildingFilter);
+        }
+        if (typeFilter) {
+            devices = devices.filter(d => d.type === typeFilter);
+        }
+
+        renderNetworkTable(devices);
+    } catch (error) {
+        console.error('Ошибка фильтрации сетевых устройств:', error);
+        renderNetworkTable([]);
+    }
+}
 
 function openNetworkModal() {
     console.log('🌐 Открытие модального окна сетевого оборудования');
-    NotificationManager.info('Функция в разработке');
+    
+    try {
+        editingId = null;
+        currentEditingType = 'network';
+        document.getElementById('networkModalTitle').textContent = 'Добавить сетевое устройство';
+        
+        // Очищаем форму
+        const form = document.getElementById('networkForm');
+        if (form) {
+            form.reset();
+        }
+        
+        document.getElementById('networkModal').style.display = 'block';
+    } catch (error) {
+        console.error('Ошибка открытия модального окна сетевого оборудования:', error);
+        NotificationManager.error('Ошибка открытия формы');
+    }
+}
+
+async function editNetworkDevice(id) {
+    console.log('✏️ Редактирование сетевого устройства ID:', id);
+    
+    try {
+        const devices = await db.getByType('networkDevices');
+        const device = devices.find(d => d.id === id);
+        
+        if (!device) {
+            NotificationManager.error('Сетевое устройство не найдено');
+            return;
+        }
+
+        editingId = id;
+        currentEditingType = 'network';
+        document.getElementById('networkModalTitle').textContent = 'Редактировать сетевое устройство';
+        
+        // Заполняем форму
+        document.getElementById('networkType').value = device.type || '';
+        document.getElementById('networkModel').value = device.model || '';
+        document.getElementById('networkBuilding').value = device.building || '';
+        document.getElementById('networkLocation').value = device.location || '';
+        document.getElementById('networkIpAddress').value = device.ipAddress || '';
+        document.getElementById('networkLogin').value = device.login || '';
+        document.getElementById('networkPassword').value = device.password || '';
+        document.getElementById('networkWifiName').value = device.wifiName || '';
+        document.getElementById('networkWifiPassword').value = device.wifiPassword || '';
+        document.getElementById('networkNotes').value = device.notes || '';
+
+        document.getElementById('networkModal').style.display = 'block';
+    } catch (error) {
+        console.error('Ошибка редактирования сетевого устройства:', error);
+        NotificationManager.error('Ошибка при загрузке данных устройства');
+    }
+}
+
+async function deleteNetworkDevice(id) {
+    console.log('🗑️ Удаление сетевого устройства ID:', id);
+    
+    if (confirm('Вы уверены, что хотите удалить это сетевое устройство?')) {
+        try {
+            await db.delete('networkDevices', id);
+            NotificationManager.success('Сетевое устройство успешно удалено');
+            await filterNetworkDevices();
+            await updateStats();
+        } catch (error) {
+            console.error('Ошибка удаления сетевого устройства:', error);
+            NotificationManager.error('Ошибка при удалении устройства');
+        }
+    }
+}
+
+// === РАБОТА С ДРУГОЙ ТЕХНИКОЙ ===
+
+function renderOtherTable(data = []) {
+    console.log('🖨️ Рендеринг таблицы другой техники, записей:', data.length);
+    
+    const tbody = document.getElementById('otherTable');
+    if (!tbody) {
+        console.error('❌ Элемент otherTable не найден');
+        return;
+    }
+    
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
+        return;
+    }
+
+    data.forEach((device, index) => {
+        const statusClass = StatusManager ? StatusManager.getStatusClass(device.status) : 'status-working';
+        const statusText = StatusManager ? StatusManager.getStatusText(device.status) : 'Неизвестно';
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(device.type || '')}</td>
+                <td>${escapeHtml(device.model || '')}</td>
+                <td>${escapeHtml(device.building || '')}</td>
+                <td>${escapeHtml(device.location || '')}</td>
+                <td>${escapeHtml(device.responsible || '')}</td>
+                <td>${escapeHtml(device.inventoryNumber || '')}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>
+                    <button class="btn" onclick="editOtherDevice(${device.id})" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>
+                    <button class="btn btn-danger" onclick="deleteOtherDevice(${device.id})" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;" title="Удалить">🗑️</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function filterOtherDevices() {
+    console.log('🖨️ Фильтрация другой техники');
+    
+    try {
+        const searchTerm = document.getElementById('otherSearchInput')?.value || '';
+        const buildingFilter = document.getElementById('otherBuildingFilter')?.value || '';
+        const typeFilter = document.getElementById('otherTypeFilter')?.value || '';
+
+        let devices = await db.getByType('otherDevices');
+
+        // Поиск
+        if (searchTerm) {
+            devices = devices.filter(device => {
+                const searchFields = [
+                    device.type || '',
+                    device.model || '',
+                    device.location || '',
+                    device.responsible || '',
+                    device.inventoryNumber || ''
+                ];
+                return searchFields.some(field => 
+                    field.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            });
+        }
+
+        // Фильтры
+        if (buildingFilter) {
+            devices = devices.filter(d => d.building === buildingFilter);
+        }
+        if (typeFilter) {
+            devices = devices.filter(d => d.type === typeFilter);
+        }
+
+        renderOtherTable(devices);
+    } catch (error) {
+        console.error('Ошибка фильтрации другой техники:', error);
+        renderOtherTable([]);
+    }
 }
 
 function openOtherModal() {
     console.log('🖨️ Открытие модального окна другой техники');
-    NotificationManager.info('Функция в разработке');
+    
+    try {
+        editingId = null;
+        currentEditingType = 'other';
+        document.getElementById('otherModalTitle').textContent = 'Добавить устройство';
+        
+        // Очищаем форму
+        const form = document.getElementById('otherForm');
+        if (form) {
+            form.reset();
+        }
+        
+        document.getElementById('otherModal').style.display = 'block';
+    } catch (error) {
+        console.error('Ошибка открытия модального окна другой техники:', error);
+        NotificationManager.error('Ошибка открытия формы');
+    }
+}
+
+async function editOtherDevice(id) {
+    console.log('✏️ Редактирование другого устройства ID:', id);
+    
+    try {
+        const devices = await db.getByType('otherDevices');
+        const device = devices.find(d => d.id === id);
+        
+        if (!device) {
+            NotificationManager.error('Устройство не найдено');
+            return;
+        }
+
+        editingId = id;
+        currentEditingType = 'other';
+        document.getElementById('otherModalTitle').textContent = 'Редактировать устройство';
+        
+        // Заполняем форму
+        document.getElementById('otherType').value = device.type || '';
+        document.getElementById('otherModel').value = device.model || '';
+        document.getElementById('otherBuilding').value = device.building || '';
+        document.getElementById('otherLocation').value = device.location || '';
+        document.getElementById('otherResponsible').value = device.responsible || '';
+        document.getElementById('otherInventoryNumber').value = device.inventoryNumber || '';
+        document.getElementById('otherNotes').value = device.notes || '';
+
+        document.getElementById('otherModal').style.display = 'block';
+    } catch (error) {
+        console.error('Ошибка редактирования устройства:', error);
+        NotificationManager.error('Ошибка при загрузке данных устройства');
+    }
+}
+
+async function deleteOtherDevice(id) {
+    console.log('🗑️ Удаление другого устройства ID:', id);
+    
+    if (confirm('Вы уверены, что хотите удалить это устройство?')) {
+        try {
+            await db.delete('otherDevices', id);
+            NotificationManager.success('Устройство успешно удалено');
+            await filterOtherDevices();
+            await updateStats();
+        } catch (error) {
+            console.error('Ошибка удаления устройства:', error);
+            NotificationManager.error('Ошибка при удалении устройства');
+        }
+    }
+}
+
+// === РАБОТА С НАЗНАЧЕННЫМИ УСТРОЙСТВАМИ ===
+
+function renderAssignedTable(data = []) {
+    console.log('👤 Рендеринг таблицы назначенных устройств, записей:', data.length);
+    
+    const tbody = document.getElementById('assignedTable');
+    if (!tbody) {
+        console.error('❌ Элемент assignedTable не найден');
+        return;
+    }
+    
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
+        return;
+    }
+
+    data.forEach((assignment, index) => {
+        const devicesText = Array.isArray(assignment.devices) 
+            ? assignment.devices.join('; ') 
+            : assignment.devices || '';
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${index + 1}</td>
+                <td><strong>${escapeHtml(assignment.employee || '')}</strong></td>
+                <td>${escapeHtml(assignment.position || '')}</td>
+                <td>${escapeHtml(assignment.building || '')}</td>
+                <td style="max-width: 300px; word-wrap: break-word;">${escapeHtml(devicesText)}</td>
+                <td>${DateUtils ? DateUtils.formatDate(assignment.assignedDate) : assignment.assignedDate || ''}</td>
+                <td>
+                    <button class="btn" onclick="editAssignment(${assignment.id})" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>
+                    <button class="btn btn-danger" onclick="deleteAssignment(${assignment.id})" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;" title="Удалить">🗑️</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function filterAssignedDevices() {
+    console.log('👤 Фильтрация назначенных устройств');
+    
+    try {
+        const searchTerm = document.getElementById('assignedSearchInput')?.value || '';
+        const buildingFilter = document.getElementById('assignedBuildingFilter')?.value || '';
+
+        let assignments = await db.getByType('assignedDevices');
+
+        // Поиск
+        if (searchTerm) {
+            assignments = assignments.filter(assignment => {
+                const devicesText = Array.isArray(assignment.devices) 
+                    ? assignment.devices.join(' ') 
+                    : assignment.devices || '';
+                    
+                const searchFields = [
+                    assignment.employee || '',
+                    assignment.position || '',
+                    devicesText
+                ];
+                return searchFields.some(field => 
+                    field.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            });
+        }
+
+        // Фильтры
+        if (buildingFilter) {
+            assignments = assignments.filter(a => a.building === buildingFilter);
+        }
+
+        renderAssignedTable(assignments);
+    } catch (error) {
+        console.error('Ошибка фильтрации назначенных устройств:', error);
+        renderAssignedTable([]);
+    }
 }
 
 function openAssignedModal() {
     console.log('👤 Открытие модального окна назначенных устройств');
-    NotificationManager.info('Функция в разработке');
-}
-
-async function filterNetworkDevices() {
-    console.log('🌐 Фильтрация сетевых устройств (заглушка)');
-    const tbody = document.getElementById('networkTable');
-    if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">Функция в разработке</td></tr>';
-    }
-}
-
-async function filterOtherDevices() {
-    console.log('🖨️ Фильтрация другой техники (заглушка)');
-    const tbody = document.getElementById('otherTable');
-    if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">Функция в разработке</td></tr>';
-    }
-}
-
-async function filterAssignedDevices() {
-    console.log('👤 Фильтрация назначенных устройств (заглушка)');
-    const tbody = document.getElementById('assignedTable');
-    if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">Функция в разработке</td></tr>';
-    }
-}
-
-// === РАБОТА С ИМПОРТИРОВАННЫМИ ДАННЫМИ ===
-
-async function showImportedData() {
-    console.log('👁️ Показ импортированных данных');
     
     try {
-        const importedData = await db.getImportedComputers();
-        console.log('📊 Импортированные данные:', importedData);
+        editingId = null;
+        currentEditingType = 'assigned';
+        document.getElementById('assignedModalTitle').textContent = 'Назначить устройство сотруднику';
         
-        if (importedData.length === 0) {
-            NotificationManager.info('Нет импортированных данных');
+        // Очищаем форму
+        const form = document.getElementById('assignedForm');
+        if (form) {
+            form.reset();
+        }
+        
+        // Устанавливаем текущую дату
+        document.getElementById('assignedDate').value = DateUtils ? DateUtils.getCurrentDate() : '';
+        
+        resetDeviceSearch();
+        document.getElementById('assignedModal').style.display = 'block';
+    } catch (error) {
+        console.error('Ошибка открытия модального окна назначенных устройств:', error);
+        NotificationManager.error('Ошибка открытия формы');
+    }
+}
+
+async function editAssignment(id) {
+    console.log('✏️ Редактирование назначения ID:', id);
+    
+    try {
+        const assignments = await db.getByType('assignedDevices');
+        const assignment = assignments.find(a => a.id === id);
+        
+        if (!assignment) {
+            NotificationManager.error('Назначение не найдено');
+            return;
+        }
+
+        editingId = id;
+        currentEditingType = 'assigned';
+        document.getElementById('assignedModalTitle').textContent = 'Редактировать назначение';
+        
+        // Заполняем форму
+        document.getElementById('assignedEmployee').value = assignment.employee || '';
+        document.getElementById('assignedPosition').value = assignment.position || '';
+        document.getElementById('assignedBuilding').value = assignment.building || '';
+        document.getElementById('assignedDate').value = assignment.assignedDate || '';
+        document.getElementById('assignedNotes').value = assignment.notes || '';
+        
+        // Заполняем устройства
+        const devicesText = Array.isArray(assignment.devices) 
+            ? assignment.devices.join('\n') 
+            : assignment.devices || '';
+        document.getElementById('assignedDevices').value = devicesText;
+
+        resetDeviceSearch();
+        document.getElementById('assignedModal').style.display = 'block';
+    } catch (error) {
+        console.error('Ошибка редактирования назначения:', error);
+        NotificationManager.error('Ошибка при загрузке данных назначения');
+    }
+}
+
+async function deleteAssignment(id) {
+    console.log('🗑️ Удаление назначения ID:', id);
+    
+    if (confirm('Вы уверены, что хотите удалить это назначение?')) {
+        try {
+            await db.delete('assignedDevices', id);
+            NotificationManager.success('Назначение успешно удалено');
+            await filterAssignedDevices();
+            await updateStats();
+        } catch (error) {
+            console.error('Ошибка удаления назначения:', error);
+            NotificationManager.error('Ошибка при удалении назначения');
+        }
+    }
+}
+
+// === ТАБЛИЦА IP АДРЕСОВ ===
+
+async function renderIPAddressTable() {
+    console.log('🌐 Рендеринг таблицы IP адресов');
+    
+    try {
+        // Получаем все устройства с IP адресами
+        const [computers, networkDevices] = await Promise.all([
+            db.getByType('computers'),
+            db.getByType('networkDevices')
+        ]);
+        
+        // Создаем карту используемых IP адресов
+        const usedIPs = new Map();
+        
+        // Добавляем компьютеры
+        computers.forEach(computer => {
+            if (computer.ipAddress && computer.ipAddress.startsWith('192.168.100.')) {
+                usedIPs.set(computer.ipAddress, {
+                    type: 'Компьютер',
+                    name: computer.computerName || computer.model || 'Неизвестно',
+                    location: computer.location || '',
+                    status: computer.status || 'working'
+                });
+            }
+        });
+        
+        // Добавляем сетевые устройства
+        networkDevices.forEach(device => {
+            if (device.ipAddress && device.ipAddress.startsWith('192.168.100.')) {
+                usedIPs.set(device.ipAddress, {
+                    type: device.type || 'Сетевое устройство',
+                    name: device.model || 'Неизвестно',
+                    location: device.location || '',
+                    status: device.status || 'working'
+                });
+            }
+        });
+        
+        const tbody = document.getElementById('ipTable');
+        if (!tbody) {
+            console.error('❌ Элемент ipTable не найден');
             return;
         }
         
-        // Временно показываем импортированные данные в таблице компьютеров
-        renderComputerTable(importedData);
-        NotificationManager.info(`Показано ${importedData.length} импортированных записей`);
+        tbody.innerHTML = '';
         
-    } catch (error) {
-        console.error('Ошибка получения импортированных данных:', error);
-        NotificationManager.error('Ошибка получения импортированных данных');
-    }
-}
-
-async function migrateImportedData() {
-    console.log('🔄 Миграция импортированных данных');
-    
-    if (!confirm('Перенести все импортированные данные в основную таблицу компьютеров?')) {
-        return;
-    }
-    
-    try {
-        NotificationManager.info('Начинается перенос данных...');
-        
-        const result = await db.migrateImportedData();
-        console.log('📊 Результат миграции:', result);
-        
-        if (result.success) {
-            let message = `Успешно перенесено ${result.migratedCount} из ${result.totalImported} записей`;
+        // Генерируем таблицу IP адресов от 192.168.100.1 до 192.168.100.254
+        for (let i = 1; i <= 254; i++) {
+            const ip = `192.168.100.${i}`;
+            const device = usedIPs.get(ip);
             
-            if (result.errors && result.errors.length > 0) {
-                message += ` с ${result.errors.length} ошибками`;
-                console.warn('⚠️ Ошибки миграции:', result.errors);
+            let statusClass = 'status-free';
+            let deviceInfo = 'Свободен';
+            let typeInfo = '';
+            let locationInfo = '';
+            
+            if (device) {
+                statusClass = StatusManager ? StatusManager.getStatusClass(device.status) : 'status-working';
+                deviceInfo = device.name;
+                typeInfo = device.type;
+                locationInfo = device.location;
             }
             
-            NotificationManager.success(message);
-            await filterComputers(); // Обновляем основную таблицу
-            await updateStats();
-        } else {
-            NotificationManager.error('Ошибка при миграции данных');
+            tbody.innerHTML += `
+                <tr class="${device ? 'ip-used' : 'ip-free'}">
+                    <td>${i}</td>
+                    <td><strong>${ip}</strong></td>
+                    <td>${typeInfo}</td>
+                    <td>${deviceInfo}</td>
+                    <td>${locationInfo}</td>
+                    <td><span class="status-badge ${statusClass}">${device ? (StatusManager ? StatusManager.getStatusText(device.status) : 'Используется') : 'Свободен'}</span></td>
+                    <td>
+                        ${device ? 
+                            `<button class="btn" onclick="editDeviceByIP('${ip}')" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>` :
+                            `<button class="btn btn-success" onclick="assignIP('${ip}')" style="font-size: 12px; padding: 5px 10px;" title="Назначить">➕</button>`
+                        }
+                    </td>
+                </tr>
+            `;
         }
     } catch (error) {
-        console.error('Ошибка миграции:', error);
-        NotificationManager.error('Ошибка при миграции данных: ' + error.message);
+        console.error('Ошибка рендеринга таблицы IP адресов:', error);
+        const tbody = document.getElementById('ipTable');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">Ошибка загрузки данных</td></tr>';
+        }
     }
 }
 
-// Добавляем обработку формы компьютеров с отладкой
+async function editDeviceByIP(ip) {
+    console.log('✏️ Редактирование устройства по IP:', ip);
+    
+    try {
+        // Ищем устройство по IP
+        const [computers, networkDevices] = await Promise.all([
+            db.getByType('computers'),
+            db.getByType('networkDevices')
+        ]);
+        
+        let device = computers.find(c => c.ipAddress === ip);
+        if (device) {
+            await editComputer(device.id);
+            return;
+        }
+        
+        device = networkDevices.find(d => d.ipAddress === ip);
+        if (device) {
+            await editNetworkDevice(device.id);
+            return;
+        }
+        
+        NotificationManager.warning('Устройство с данным IP не найдено');
+    } catch (error) {
+        console.error('Ошибка поиска устройства по IP:', error);
+        NotificationManager.error('Ошибка поиска устройства');
+    }
+}
+
+function assignIP(ip) {
+    console.log('➕ Назначение IP адреса:', ip);
+    
+    // Открываем модальное окно для выбора типа устройства
+    const deviceType = prompt('Выберите тип устройства:\n1 - Компьютер\n2 - Сетевое устройство\n\nВведите номер:');
+    
+    if (deviceType === '1') {
+        openComputerModal();
+        // Автоматически заполняем IP
+        setTimeout(() => {
+            document.getElementById('computerIpAddress').value = ip;
+        }, 100);
+    } else if (deviceType === '2') {
+        openNetworkModal();
+        // Автоматически заполняем IP
+        setTimeout(() => {
+            document.getElementById('networkIpAddress').value = ip;
+        }, 100);
+    }
+}
+
+// === ОБРАБОТЧИКИ ФОРМ ===
+
+// Добавляем обработку формы компьютеров
 async function handleComputerSubmit(e) {
     e.preventDefault();
     console.log('💾 Отправка формы компьютера');
@@ -465,6 +974,210 @@ async function handleComputerSubmit(e) {
     } catch (error) {
         console.error('❌ Ошибка сохранения компьютера:', error);
         NotificationManager.error('Ошибка при сохранении: ' + error.message);
+    }
+}
+
+// Обработка формы сетевого оборудования
+async function handleNetworkSubmit(e) {
+    e.preventDefault();
+    console.log('💾 Отправка формы сетевого оборудования');
+
+    try {
+        const formData = {
+            type: document.getElementById('networkType').value,
+            model: document.getElementById('networkModel').value.trim(),
+            building: document.getElementById('networkBuilding').value,
+            location: document.getElementById('networkLocation').value.trim(),
+            ipAddress: document.getElementById('networkIpAddress').value.trim(),
+            login: document.getElementById('networkLogin').value.trim(),
+            password: document.getElementById('networkPassword').value.trim(),
+            wifiName: document.getElementById('networkWifiName').value.trim(),
+            wifiPassword: document.getElementById('networkWifiPassword').value.trim(),
+            notes: document.getElementById('networkNotes').value.trim()
+        };
+
+        // Валидация
+        const errors = [];
+        if (!formData.type) errors.push('Тип устройства обязателен');
+        if (!formData.model) errors.push('Модель обязательна');
+        if (!formData.building) errors.push('Корпус обязателен');
+        if (!formData.location) errors.push('Расположение обязательно');
+        if (!formData.ipAddress) errors.push('IP-адрес обязателен');
+
+        if (errors.length > 0) {
+            NotificationManager.error(errors.join('\n'));
+            return;
+        }
+
+        if (!Validator.isValidIP(formData.ipAddress)) {
+            NotificationManager.error('Некорректный формат IP-адреса');
+            return;
+        }
+
+        if (editingId && currentEditingType === 'network') {
+            await db.update('networkDevices', editingId, formData);
+            NotificationManager.success('Сетевое устройство успешно обновлено');
+        } else {
+            await db.add('networkDevices', formData);
+            NotificationManager.success('Сетевое устройство успешно добавлено');
+        }
+
+        await filterNetworkDevices();
+        await updateStats();
+        closeModal('networkModal');
+    } catch (error) {
+        console.error('❌ Ошибка сохранения сетевого устройства:', error);
+        NotificationManager.error('Ошибка при сохранении: ' + error.message);
+    }
+}
+
+// Обработка формы другой техники
+async function handleOtherSubmit(e) {
+    e.preventDefault();
+    console.log('💾 Отправка формы другой техники');
+
+    try {
+        const formData = {
+            type: document.getElementById('otherType').value,
+            model: document.getElementById('otherModel').value.trim(),
+            building: document.getElementById('otherBuilding').value,
+            location: document.getElementById('otherLocation').value.trim(),
+            responsible: document.getElementById('otherResponsible').value.trim(),
+            inventoryNumber: document.getElementById('otherInventoryNumber').value.trim(),
+            notes: document.getElementById('otherNotes').value.trim()
+        };
+
+        // Валидация
+        const errors = [];
+        if (!formData.type) errors.push('Тип устройства обязателен');
+        if (!formData.model) errors.push('Модель обязательна');
+        if (!formData.building) errors.push('Корпус обязателен');
+        if (!formData.location) errors.push('Расположение обязательно');
+
+        if (errors.length > 0) {
+            NotificationManager.error(errors.join('\n'));
+            return;
+        }
+
+        if (editingId && currentEditingType === 'other') {
+            await db.update('otherDevices', editingId, formData);
+            NotificationManager.success('Устройство успешно обновлено');
+        } else {
+            await db.add('otherDevices', formData);
+            NotificationManager.success('Устройство успешно добавлено');
+        }
+
+        await filterOtherDevices();
+        await updateStats();
+        closeModal('otherModal');
+    } catch (error) {
+        console.error('❌ Ошибка сохранения устройства:', error);
+        NotificationManager.error('Ошибка при сохранении: ' + error.message);
+    }
+}
+
+// Обработка формы назначенных устройств
+async function handleAssignedSubmit(e) {
+    e.preventDefault();
+    console.log('💾 Отправка формы назначенных устройств');
+
+    try {
+        const devicesText = document.getElementById('assignedDevices').value.trim();
+        const devices = devicesText.split('\n').filter(line => line.trim() !== '');
+
+        const formData = {
+            employee: document.getElementById('assignedEmployee').value.trim(),
+            position: document.getElementById('assignedPosition').value.trim(),
+            building: document.getElementById('assignedBuilding').value,
+            devices: devices,
+            assignedDate: document.getElementById('assignedDate').value,
+            notes: document.getElementById('assignedNotes').value.trim()
+        };
+
+        // Валидация
+        const errors = [];
+        if (!formData.employee) errors.push('ФИО сотрудника обязательно');
+        if (!formData.position) errors.push('Должность обязательна');
+        if (!formData.building) errors.push('Корпус обязателен');
+        if (!formData.assignedDate) errors.push('Дата назначения обязательна');
+        if (devices.length === 0) errors.push('Необходимо указать хотя бы одно устройство');
+
+        if (errors.length > 0) {
+            NotificationManager.error(errors.join('\n'));
+            return;
+        }
+
+        if (editingId && currentEditingType === 'assigned') {
+            await db.update('assignedDevices', editingId, formData);
+            NotificationManager.success('Назначение успешно обновлено');
+        } else {
+            await db.add('assignedDevices', formData);
+            NotificationManager.success('Устройство успешно назначено');
+        }
+
+        await filterAssignedDevices();
+        await updateStats();
+        closeModal('assignedModal');
+    } catch (error) {
+        console.error('❌ Ошибка сохранения назначения:', error);
+        NotificationManager.error('Ошибка при сохранении: ' + error.message);
+    }
+}
+
+// === РАБОТА С ИМПОРТИРОВАННЫМИ ДАННЫМИ ===
+
+async function showImportedData() {
+    console.log('👁️ Показ импортированных данных');
+    
+    try {
+        const importedData = await db.getImportedComputers();
+        console.log('📊 Импортированные данные:', importedData);
+        
+        if (importedData.length === 0) {
+            NotificationManager.info('Нет импортированных данных');
+            return;
+        }
+        
+        // Временно показываем импортированные данные в таблице компьютеров
+        renderComputerTable(importedData);
+        NotificationManager.info(`Показано ${importedData.length} импортированных записей`);
+        
+    } catch (error) {
+        console.error('Ошибка получения импортированных данных:', error);
+        NotificationManager.error('Ошибка получения импортированных данных');
+    }
+}
+
+async function migrateImportedData() {
+    console.log('🔄 Миграция импортированных данных');
+    
+    if (!confirm('Перенести все импортированные данные в основную таблицу компьютеров?')) {
+        return;
+    }
+    
+    try {
+        NotificationManager.info('Начинается перенос данных...');
+        
+        const result = await db.migrateImportedData();
+        console.log('📊 Результат миграции:', result);
+        
+        if (result.success) {
+            let message = `Успешно перенесено ${result.migratedCount} из ${result.totalImported} записей`;
+            
+            if (result.errors && result.errors.length > 0) {
+                message += ` с ${result.errors.length} ошибками`;
+                console.warn('⚠️ Ошибки миграции:', result.errors);
+            }
+            
+            NotificationManager.success(message);
+            await filterComputers(); // Обновляем основную таблицу
+            await updateStats();
+        } else {
+            NotificationManager.error('Ошибка при миграции данных');
+        }
+    } catch (error) {
+        console.error('Ошибка миграции:', error);
+        NotificationManager.error('Ошибка при миграции данных: ' + error.message);
     }
 }
 
@@ -611,6 +1324,49 @@ async function searchByInventoryNumber() {
     }
 }
 
+async function searchDeviceByInventoryNumber() {
+    console.log('🔍 Поиск устройства для назначения по инвентарному номеру');
+    
+    const inventoryNumber = document.getElementById('deviceSearchInput')?.value?.trim();
+    if (!inventoryNumber) {
+        NotificationManager.warning('Введите инвентарный номер устройства');
+        return;
+    }
+
+    try {
+        const result = await db.findByInventoryNumber(inventoryNumber);
+        const searchBox = document.getElementById('deviceSearchBox');
+        const infoElement = document.getElementById('deviceAutoFillInfo');
+
+        if (result) {
+            searchBox.className = 'inventory-search inventory-found';
+            const deviceName = result.data.model || result.data.type || 'Устройство';
+            infoElement.textContent = `✅ Найдено: ${deviceName}`;
+            
+            // Добавляем устройство в список
+            const devicesTextarea = document.getElementById('assignedDevices');
+            const currentDevices = devicesTextarea.value.trim();
+            const newDevice = `${deviceName} (${inventoryNumber})`;
+            
+            if (currentDevices) {
+                devicesTextarea.value = currentDevices + '\n' + newDevice;
+            } else {
+                devicesTextarea.value = newDevice;
+            }
+            
+            NotificationManager.success('Устройство добавлено в список');
+            document.getElementById('deviceSearchInput').value = '';
+        } else {
+            searchBox.className = 'inventory-search inventory-not-found';
+            infoElement.textContent = `❌ Устройство с номером "${inventoryNumber}" не найдено`;
+            NotificationManager.warning('Устройство не найдено в базе данных');
+        }
+    } catch (error) {
+        console.error('Ошибка поиска устройства:', error);
+        NotificationManager.error('Ошибка при поиске устройства');
+    }
+}
+
 function fillComputerFormFromData(data) {
     document.getElementById('computerInventoryNumber').value = data.inventoryNumber || '';
     document.getElementById('computerLocation').value = data.location || '';
@@ -639,6 +1395,16 @@ function resetInventorySearch() {
     if (searchInput) searchInput.value = '';
 }
 
+function resetDeviceSearch() {
+    const searchBox = document.getElementById('deviceSearchBox');
+    const infoElement = document.getElementById('deviceAutoFillInfo');
+    const searchInput = document.getElementById('deviceSearchInput');
+    
+    if (searchBox) searchBox.className = 'inventory-search';
+    if (infoElement) infoElement.textContent = 'Поиск устройства по инвентарному номеру для быстрого добавления';
+    if (searchInput) searchInput.value = '';
+}
+
 // === МОДАЛЬНЫЕ ОКНА ===
 
 function closeModal(modalId) {
@@ -652,6 +1418,7 @@ function closeModal(modalId) {
     editingId = null;
     currentEditingType = null;
     resetInventorySearch();
+    resetDeviceSearch();
 }
 
 // === УТИЛИТЫ ===
@@ -687,27 +1454,66 @@ function setupEventListeners() {
         if (input) {
             input.addEventListener('input', debounce(() => {
                 if (inputId === 'computerSearchInput') filterComputers();
+                else if (inputId === 'networkSearchInput') filterNetworkDevices();
+                else if (inputId === 'otherSearchInput') filterOtherDevices();
+                else if (inputId === 'assignedSearchInput') filterAssignedDevices();
             }, 300));
         }
     });
 
-    // Фильтры
-    const filters = ['buildingFilter', 'typeFilter', 'statusFilter'];
-    filters.forEach(filterId => {
+    // Фильтры для компьютеров
+    const computerFilters = ['buildingFilter', 'typeFilter', 'statusFilter'];
+    computerFilters.forEach(filterId => {
         const filter = document.getElementById(filterId);
         if (filter) {
             filter.addEventListener('change', () => filterComputers());
         }
     });
 
+    // Фильтры для сетевого оборудования
+    const networkFilters = ['networkBuildingFilter', 'networkTypeFilter'];
+    networkFilters.forEach(filterId => {
+        const filter = document.getElementById(filterId);
+        if (filter) {
+            filter.addEventListener('change', () => filterNetworkDevices());
+        }
+    });
+
+    // Фильтры для другой техники
+    const otherFilters = ['otherBuildingFilter', 'otherTypeFilter'];
+    otherFilters.forEach(filterId => {
+        const filter = document.getElementById(filterId);
+        if (filter) {
+            filter.addEventListener('change', () => filterOtherDevices());
+        }
+    });
+
+    // Фильтры для назначенных устройств
+    const assignedFilters = ['assignedBuildingFilter'];
+    assignedFilters.forEach(filterId => {
+        const filter = document.getElementById(filterId);
+        if (filter) {
+            filter.addEventListener('change', () => filterAssignedDevices());
+        }
+    });
+
     // Обработчики форм
-    const computerForm = document.getElementById('computerForm');
-    if (computerForm) {
-        computerForm.addEventListener('submit', handleComputerSubmit);
-        console.log('✅ Обработчик формы компьютера установлен');
-    } else {
-        console.error('❌ Форма компьютера не найдена');
-    }
+    const forms = [
+        { id: 'computerForm', handler: handleComputerSubmit },
+        { id: 'networkForm', handler: handleNetworkSubmit },
+        { id: 'otherForm', handler: handleOtherSubmit },
+        { id: 'assignedForm', handler: handleAssignedSubmit }
+    ];
+
+    forms.forEach(({ id, handler }) => {
+        const form = document.getElementById(id);
+        if (form) {
+            form.addEventListener('submit', handler);
+            console.log(`✅ Обработчик формы ${id} установлен`);
+        } else {
+            console.warn(`⚠️ Форма ${id} не найдена`);
+        }
+    });
 
     // Закрытие модальных окон по клику вне их
     window.addEventListener('click', function(event) {
@@ -733,18 +1539,24 @@ window.openOtherModal = openOtherModal;
 window.openAssignedModal = openAssignedModal;
 window.editComputer = editComputer;
 window.deleteComputer = deleteComputer;
+window.editNetworkDevice = editNetworkDevice;
+window.deleteNetworkDevice = deleteNetworkDevice;
+window.editOtherDevice = editOtherDevice;
+window.deleteOtherDevice = deleteOtherDevice;
+window.editAssignment = editAssignment;
+window.deleteAssignment = deleteAssignment;
+window.editDeviceByIP = editDeviceByIP;
+window.assignIP = assignIP;
 window.closeModal = closeModal;
 window.exportData = exportData;
 window.exportToExcel = exportToExcel;
 window.importComputers = importComputers;
 window.searchByInventoryNumber = searchByInventoryNumber;
+window.searchDeviceByInventoryNumber = searchDeviceByInventoryNumber;
+window.showImportedData = showImportedData;
+window.migrateImportedData = migrateImportedData;
 
 // Отладочные функции
-window.testClick = function() {
-    console.log('🔧 Тестовая кнопка работает!');
-    NotificationManager.success('Тестовая кнопка работает!');
-};
-
 window.initApp = initializeApp;
 window.checkDeps = checkDependencies;
 
@@ -760,7 +1572,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Приложение полностью инициализировано');
         
         // Проверяем доступность функций
-        const testFunctions = ['openTab', 'openComputerModal', 'exportData'];
+        const testFunctions = ['openTab', 'openComputerModal', 'openNetworkModal', 'openOtherModal', 'openAssignedModal'];
         console.log('🔍 Проверка функций:');
         testFunctions.forEach(funcName => {
             console.log(`${funcName}: ${typeof window[funcName]}`);

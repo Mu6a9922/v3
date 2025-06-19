@@ -39,8 +39,7 @@
             <button class="tab-button" onclick="openTab(event, 'network')">🌐 Сетевое оборудование</button>
             <button class="tab-button" onclick="openTab(event, 'other')">🖨️ Другая техника</button>
             <button class="tab-button" onclick="openTab(event, 'assigned')">👤 Персональные устройства</button>
-            <!-- Тестовая кнопка для отладки -->
-            <button class="tab-button" onclick="testClick()" style="background: #ff6b6b;">🔧 Тест</button>
+            <button class="tab-button" onclick="openTab(event, 'ipaddresses')">📊 IP адреса</button>
         </div>
 
         <!-- Вкладка "Компьютеры" -->
@@ -218,6 +217,32 @@
                         </tr>
                     </thead>
                     <tbody id="assignedTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Вкладка "IP адреса" -->
+        <div id="ipaddresses" class="tab-content">
+            <div class="controls">
+                <h3>📊 Таблица IP адресов сети 192.168.100.0/24</h3>
+                <p>Управление IP адресами от 192.168.100.1 до 192.168.100.254</p>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>IP адрес</th>
+                            <th>Тип устройства</th>
+                            <th>Устройство</th>
+                            <th>Расположение</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ipTable">
                     </tbody>
                 </table>
             </div>
@@ -524,6 +549,9 @@
             console.log('Доступные глобальные функции:', {
                 openTab: typeof window.openTab,
                 openComputerModal: typeof window.openComputerModal,
+                openNetworkModal: typeof window.openNetworkModal,
+                openOtherModal: typeof window.openOtherModal,
+                openAssignedModal: typeof window.openAssignedModal,
                 db: typeof window.db,
                 NotificationManager: typeof window.NotificationManager
             });
@@ -534,12 +562,6 @@
                 alert('Ошибка загрузки скриптов. Обновите страницу.');
             }
         });
-        
-        // Тестовая функция для проверки кликов
-        function testClick() {
-            console.log('Тестовая кнопка работает!');
-            alert('Тестовая кнопка работает!');
-        }
     </script>
 </body>
 </html>

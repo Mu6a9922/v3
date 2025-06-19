@@ -525,6 +525,88 @@ app.get('/api/network-devices', checkDB, async (req, res) => {
     }
 });
 
+app.post('/api/network-devices', checkDB, async (req, res) => {
+    try {
+        const {
+            type, model, building, location, ipAddress, login, password,
+            wifiName, wifiPassword, notes
+        } = req.body;
+
+        // Валидация обязательных полей
+        if (!type || !model || !building || !location || !ipAddress) {
+            return res.status(400).json({ 
+                error: 'Отсутствуют обязательные поля' 
+            });
+        }
+
+        const status = getStatusFromNotes(notes);
+
+        const connection = await pool.getConnection();
+        const [result] = await connection.execute(
+            `INSERT INTO network_devices (
+                type, model, building, location, ip_address, login, password,
+                wifi_name, wifi_password, notes, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [type, model, building, location, ipAddress, login || null, password || null,
+             wifiName || null, wifiPassword || null, notes || null, status]
+        );
+        connection.release();
+
+        res.json({ id: result.insertId, message: 'Сетевое устройство добавлено успешно' });
+    } catch (error) {
+        console.error('Ошибка добавления сетевого устройства:', error);
+        res.status(500).json({ error: 'Ошибка добавления сетевого устройства' });
+    }
+});
+
+app.put('/api/network-devices/:id', checkDB, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            type, model, building, location, ipAddress, login, password,
+            wifiName, wifiPassword, notes
+        } = req.body;
+
+        if (!type || !model || !building || !location || !ipAddress) {
+            return res.status(400).json({ 
+                error: 'Отсутствуют обязательные поля' 
+            });
+        }
+
+        const status = getStatusFromNotes(notes);
+
+        const connection = await pool.getConnection();
+        await connection.execute(
+            `UPDATE network_devices SET
+                type = ?, model = ?, building = ?, location = ?, ip_address = ?,
+                login = ?, password = ?, wifi_name = ?, wifi_password = ?, notes = ?, status = ?
+            WHERE id = ?`,
+            [type, model, building, location, ipAddress, login || null, password || null,
+             wifiName || null, wifiPassword || null, notes || null, status, id]
+        );
+        connection.release();
+
+        res.json({ message: 'Сетевое устройство обновлено успешно' });
+    } catch (error) {
+        console.error('Ошибка обновления сетевого устройства:', error);
+        res.status(500).json({ error: 'Ошибка обновления сетевого устройства' });
+    }
+});
+
+app.delete('/api/network-devices/:id', checkDB, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const connection = await pool.getConnection();
+        await connection.execute('DELETE FROM network_devices WHERE id = ?', [id]);
+        connection.release();
+
+        res.json({ message: 'Сетевое устройство удалено успешно' });
+    } catch (error) {
+        console.error('Ошибка удаления сетевого устройства:', error);
+        res.status(500).json({ error: 'Ошибка удаления сетевого устройства' });
+    }
+});
+
 // === ДРУГАЯ ТЕХНИКА ===
 
 app.get('/api/other-devices', checkDB, async (req, res) => {
@@ -552,6 +634,83 @@ app.get('/api/other-devices', checkDB, async (req, res) => {
     }
 });
 
+app.post('/api/other-devices', checkDB, async (req, res) => {
+    try {
+        const {
+            type, model, building, location, responsible, inventoryNumber, notes
+        } = req.body;
+
+        // Валидация обязательных полей
+        if (!type || !model || !building || !location) {
+            return res.status(400).json({ 
+                error: 'Отсутствуют обязательные поля' 
+            });
+        }
+
+        const status = getStatusFromNotes(notes);
+
+        const connection = await pool.getConnection();
+        const [result] = await connection.execute(
+            `INSERT INTO other_devices (
+                type, model, building, location, responsible, inventory_number, notes, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [type, model, building, location, responsible || null, inventoryNumber || null, notes || null, status]
+        );
+        connection.release();
+
+        res.json({ id: result.insertId, message: 'Устройство добавлено успешно' });
+    } catch (error) {
+        console.error('Ошибка добавления устройства:', error);
+        res.status(500).json({ error: 'Ошибка добавления устройства' });
+    }
+});
+
+app.put('/api/other-devices/:id', checkDB, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            type, model, building, location, responsible, inventoryNumber, notes
+        } = req.body;
+
+        if (!type || !model || !building || !location) {
+            return res.status(400).json({ 
+                error: 'Отсутствуют обязательные поля' 
+            });
+        }
+
+        const status = getStatusFromNotes(notes);
+
+        const connection = await pool.getConnection();
+        await connection.execute(
+            `UPDATE other_devices SET
+                type = ?, model = ?, building = ?, location = ?, responsible = ?,
+                inventory_number = ?, notes = ?, status = ?
+            WHERE id = ?`,
+            [type, model, building, location, responsible || null, inventoryNumber || null, notes || null, status, id]
+        );
+        connection.release();
+
+        res.json({ message: 'Устройство обновлено успешно' });
+    } catch (error) {
+        console.error('Ошибка обновления устройства:', error);
+        res.status(500).json({ error: 'Ошибка обновления устройства' });
+    }
+});
+
+app.delete('/api/other-devices/:id', checkDB, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const connection = await pool.getConnection();
+        await connection.execute('DELETE FROM other_devices WHERE id = ?', [id]);
+        connection.release();
+
+        res.json({ message: 'Устройство удалено успешно' });
+    } catch (error) {
+        console.error('Ошибка удаления устройства:', error);
+        res.status(500).json({ error: 'Ошибка удаления устройства' });
+    }
+});
+
 // === НАЗНАЧЕННЫЕ УСТРОЙСТВА ===
 
 app.get('/api/assigned-devices', checkDB, async (req, res) => {
@@ -574,6 +733,83 @@ app.get('/api/assigned-devices', checkDB, async (req, res) => {
     } catch (error) {
         console.error('Ошибка получения назначенных устройств:', error);
         res.status(500).json({ error: 'Ошибка получения назначенных устройств' });
+    }
+});
+
+app.post('/api/assigned-devices', checkDB, async (req, res) => {
+    try {
+        const {
+            employee, position, building, devices, assignedDate, notes
+        } = req.body;
+
+        // Валидация обязательных полей
+        if (!employee || !position || !building || !devices || !assignedDate) {
+            return res.status(400).json({ 
+                error: 'Отсутствуют обязательные поля' 
+            });
+        }
+
+        // Преобразуем массив устройств в JSON строку
+        const devicesJson = Array.isArray(devices) ? JSON.stringify(devices) : JSON.stringify([devices]);
+
+        const connection = await pool.getConnection();
+        const [result] = await connection.execute(
+            `INSERT INTO assigned_devices (
+                employee, position, building, devices, assigned_date, notes
+            ) VALUES (?, ?, ?, ?, ?, ?)`,
+            [employee, position, building, devicesJson, assignedDate, notes || null]
+        );
+        connection.release();
+
+        res.json({ id: result.insertId, message: 'Устройство назначено успешно' });
+    } catch (error) {
+        console.error('Ошибка назначения устройства:', error);
+        res.status(500).json({ error: 'Ошибка назначения устройства' });
+    }
+});
+
+app.put('/api/assigned-devices/:id', checkDB, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            employee, position, building, devices, assignedDate, notes
+        } = req.body;
+
+        if (!employee || !position || !building || !devices || !assignedDate) {
+            return res.status(400).json({ 
+                error: 'Отсутствуют обязательные поля' 
+            });
+        }
+
+        const devicesJson = Array.isArray(devices) ? JSON.stringify(devices) : JSON.stringify([devices]);
+
+        const connection = await pool.getConnection();
+        await connection.execute(
+            `UPDATE assigned_devices SET
+                employee = ?, position = ?, building = ?, devices = ?, assigned_date = ?, notes = ?
+            WHERE id = ?`,
+            [employee, position, building, devicesJson, assignedDate, notes || null, id]
+        );
+        connection.release();
+
+        res.json({ message: 'Назначение обновлено успешно' });
+    } catch (error) {
+        console.error('Ошибка обновления назначения:', error);
+        res.status(500).json({ error: 'Ошибка обновления назначения' });
+    }
+});
+
+app.delete('/api/assigned-devices/:id', checkDB, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const connection = await pool.getConnection();
+        await connection.execute('DELETE FROM assigned_devices WHERE id = ?', [id]);
+        connection.release();
+
+        res.json({ message: 'Назначение удалено успешно' });
+    } catch (error) {
+        console.error('Ошибка удаления назначения:', error);
+        res.status(500).json({ error: 'Ошибка удаления назначения' });
     }
 });
 
