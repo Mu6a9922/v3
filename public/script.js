@@ -913,8 +913,27 @@ async function editDeviceByIP(ip) {
     }
 }
 
-function assignIP(ip) {
-    console.log('➕ Назначение IP адреса:', ip);
+        const actionMap = { create: 'добавлено', update: 'изменено', delete: 'удалено' };
+        const tableMap = {
+            computers: 'Компьютеры',
+            network_devices: 'Сетевое оборудование',
+            other_devices: 'Другая техника',
+            assigned_devices: 'Персональные устройства'
+        };
+
+        function formatDetails(details) {
+            if (!details) return '';
+            const before = details.before ? JSON.stringify(details.before) : '';
+            const after = details.after ? JSON.stringify(details.after) : '';
+            if (before && after) return `до: ${before}\nпосле: ${after}`;
+            return before || after;
+        }
+            const action = actionMap[item.action] || item.action;
+            const table = tableMap[item.table] || item.table;
+            const detailsText = formatDetails(item.details);
+                    <td>${escapeHtml(table)}</td>
+                    <td>${escapeHtml(action)}</td>
+                    <td style="white-space: pre-wrap">${escapeHtml(detailsText)}</td>
     
     // Открываем модальное окно для выбора типа устройства
     const deviceType = prompt('Выберите тип устройства:\n1 - Компьютер\n2 - Сетевое устройство\n\nВведите номер:');
