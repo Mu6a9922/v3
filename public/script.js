@@ -248,7 +248,9 @@ function openComputerModal() {
         if (form) {
             form.reset();
         }
+
         document.getElementById('computerStatus').value = 'working';
+
         
         // Сбрасываем состояние поиска
         resetInventorySearch();
@@ -290,7 +292,9 @@ async function editComputer(id) {
         document.getElementById('computerName').value = computer.computerName || '';
         document.getElementById('computerYear').value = computer.year || '';
         document.getElementById('computerNotes').value = computer.notes || '';
+
         document.getElementById('computerStatus').value = computer.status || 'working';
+
 
         resetInventorySearch();
         document.getElementById('computerModal').style.display = 'block';
@@ -411,7 +415,9 @@ function openNetworkModal() {
         if (form) {
             form.reset();
         }
+
         document.getElementById('networkStatus').value = 'working';
+
         
         document.getElementById('networkModal').style.display = 'block';
     } catch (error) {
@@ -447,7 +453,9 @@ async function editNetworkDevice(id) {
         document.getElementById('networkWifiName').value = device.wifiName || '';
         document.getElementById('networkWifiPassword').value = device.wifiPassword || '';
         document.getElementById('networkNotes').value = device.notes || '';
+
         document.getElementById('networkStatus').value = device.status || 'working';
+
 
         document.getElementById('networkModal').style.display = 'block';
     } catch (error) {
@@ -567,7 +575,9 @@ function openOtherModal() {
         if (form) {
             form.reset();
         }
+
         document.getElementById('otherStatus').value = 'working';
+
         
         document.getElementById('otherModal').style.display = 'block';
     } catch (error) {
@@ -600,7 +610,9 @@ async function editOtherDevice(id) {
         document.getElementById('otherResponsible').value = device.responsible || '';
         document.getElementById('otherInventoryNumber').value = device.inventoryNumber || '';
         document.getElementById('otherNotes').value = device.notes || '';
+
         document.getElementById('otherStatus').value = device.status || 'working';
+
 
         document.getElementById('otherModal').style.display = 'block';
     } catch (error) {
@@ -976,7 +988,9 @@ async function handleComputerSubmit(e) {
             computerName: document.getElementById('computerName').value.trim(),
             year: document.getElementById('computerYear').value.trim(),
             notes: document.getElementById('computerNotes').value.trim(),
+
             status: document.getElementById('computerStatus').value
+
         };
 
         console.log('📝 Данные формы:', formData);
@@ -1035,7 +1049,9 @@ async function handleNetworkSubmit(e) {
             wifiName: document.getElementById('networkWifiName').value.trim(),
             wifiPassword: document.getElementById('networkWifiPassword').value.trim(),
             notes: document.getElementById('networkNotes').value.trim(),
+
             status: document.getElementById('networkStatus').value
+
         };
 
         // Валидация
@@ -1087,7 +1103,9 @@ async function handleOtherSubmit(e) {
             responsible: document.getElementById('otherResponsible').value.trim(),
             inventoryNumber: document.getElementById('otherInventoryNumber').value.trim(),
             notes: document.getElementById('otherNotes').value.trim(),
+
             status: document.getElementById('otherStatus').value
+
         };
 
         // Валидация
