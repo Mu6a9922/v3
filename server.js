@@ -181,6 +181,20 @@ async function initDatabase() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
 
+        // Создание таблицы истории изменений
+        await connection.execute(`
+            CREATE TABLE IF NOT EXISTS device_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                device_table VARCHAR(50) NOT NULL,
+                device_id INT NOT NULL,
+                action VARCHAR(50) NOT NULL,
+                details TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_table (device_table),
+                INDEX idx_device (device_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
         connection.release();
         console.log('✅ Таблицы созданы успешно');
         return true;
@@ -207,6 +221,44 @@ function getStatusFromNotes(notes) {
     }
     
     return 'working';
+}
+
+// Проверка, занят ли IP-адрес
+async function isIPInUse(ip, excludeTable = null, excludeId = null) {
+    if (!ip) return false;
+    const connection = await pool.getConnection();
+    try {
+        let [rows] = await connection.execute(
+            `SELECT id FROM computers WHERE ip_address = ?${excludeTable === 'computers' ? ' AND id <> ?' : ''}`,
+            excludeTable === 'computers' ? [ip, excludeId] : [ip]
+        );
+        if (rows.length > 0) return true;
+
+        [rows] = await connection.execute(
+            `SELECT id FROM network_devices WHERE ip_address = ?${excludeTable === 'network_devices' ? ' AND id <> ?' : ''}`,
+            excludeTable === 'network_devices' ? [ip, excludeId] : [ip]
+        );
+        if (rows.length > 0) return true;
+
+        return false;
+    } finally {
+        connection.release();
+    }
+}
+
+// Добавление записи в историю изменений
+async function addHistory(table, id, action, details = null) {
+    if (!pool) return;
+    try {
+        const connection = await pool.getConnection();
+        await connection.execute(
+            'INSERT INTO device_history (device_table, device_id, action, details) VALUES (?, ?, ?, ?)',
+            [table, id, action, details]
+        );
+        connection.release();
+    } catch (error) {
+        console.error('Ошибка записи истории:', error.message);
+    }
 }
 
 // Middleware для проверки подключения к БД
@@ -410,7 +462,7 @@ app.post('/api/computers', checkDB, async (req, res) => {
     try {
         const {
             inventoryNumber, building, location, deviceType, model,
-            processor, ram, storage, graphics, ipAddress, computerName, year, notes
+            processor, ram, storage, graphics, ipAddress, computerName, year, notes, status: reqStatus
         } = req.body;
 
         // Валидация обязательных полей
@@ -420,8 +472,15 @@ app.post('/api/computers', checkDB, async (req, res) => {
             });
         }
 
-        // Определяем статус по примечаниям
-        const status = getStatusFromNotes(notes);
+        // Определяем статус
+        const status = reqStatus || getStatusFromNotes(notes);
+
+        if (ipAddress) {
+            const inUse = await isIPInUse(ipAddress);
+            if (inUse) {
+                return res.status(400).json({ error: 'IP-адрес уже используется другим устройством' });
+            }
+        }
 
         const connection = await pool.getConnection();
         const [result] = await connection.execute(
@@ -434,6 +493,8 @@ app.post('/api/computers', checkDB, async (req, res) => {
              ipAddress || null, computerName || null, year || null, notes || null, status]
         );
         connection.release();
+
+        await addHistory('computers', result.insertId, 'create', JSON.stringify(req.body));
 
         res.json({ id: result.insertId, message: 'Компьютер добавлен успешно' });
     } catch (error) {
@@ -448,7 +509,7 @@ app.put('/api/computers/:id', checkDB, async (req, res) => {
         const { id } = req.params;
         const {
             inventoryNumber, building, location, deviceType, model,
-            processor, ram, storage, graphics, ipAddress, computerName, year, notes
+            processor, ram, storage, graphics, ipAddress, computerName, year, notes, status: reqStatus
         } = req.body;
 
         // Валидация обязательных полей
@@ -458,7 +519,14 @@ app.put('/api/computers/:id', checkDB, async (req, res) => {
             });
         }
 
-        const status = getStatusFromNotes(notes);
+        const status = reqStatus || getStatusFromNotes(notes);
+
+        if (ipAddress) {
+            const inUse = await isIPInUse(ipAddress, 'computers', id);
+            if (inUse) {
+                return res.status(400).json({ error: 'IP-адрес уже используется другим устройством' });
+            }
+        }
 
         const connection = await pool.getConnection();
         await connection.execute(
@@ -472,6 +540,8 @@ app.put('/api/computers/:id', checkDB, async (req, res) => {
              ipAddress || null, computerName || null, year || null, notes || null, status, id]
         );
         connection.release();
+
+        await addHistory('computers', id, 'update', JSON.stringify(req.body));
 
         res.json({ message: 'Компьютер обновлен успешно' });
     } catch (error) {
@@ -487,6 +557,8 @@ app.delete('/api/computers/:id', checkDB, async (req, res) => {
         const connection = await pool.getConnection();
         await connection.execute('DELETE FROM computers WHERE id = ?', [id]);
         connection.release();
+
+        await addHistory('computers', id, 'delete');
 
         res.json({ message: 'Компьютер удален успешно' });
     } catch (error) {
@@ -529,7 +601,7 @@ app.post('/api/network-devices', checkDB, async (req, res) => {
     try {
         const {
             type, model, building, location, ipAddress, login, password,
-            wifiName, wifiPassword, notes
+            wifiName, wifiPassword, notes, status: reqStatus
         } = req.body;
 
         // Валидация обязательных полей
@@ -539,7 +611,14 @@ app.post('/api/network-devices', checkDB, async (req, res) => {
             });
         }
 
-        const status = getStatusFromNotes(notes);
+        const status = reqStatus || getStatusFromNotes(notes);
+
+        if (ipAddress) {
+            const inUse = await isIPInUse(ipAddress);
+            if (inUse) {
+                return res.status(400).json({ error: 'IP-адрес уже используется другим устройством' });
+            }
+        }
 
         const connection = await pool.getConnection();
         const [result] = await connection.execute(
@@ -551,6 +630,8 @@ app.post('/api/network-devices', checkDB, async (req, res) => {
              wifiName || null, wifiPassword || null, notes || null, status]
         );
         connection.release();
+
+        await addHistory('network_devices', result.insertId, 'create', JSON.stringify(req.body));
 
         res.json({ id: result.insertId, message: 'Сетевое устройство добавлено успешно' });
     } catch (error) {
@@ -564,7 +645,7 @@ app.put('/api/network-devices/:id', checkDB, async (req, res) => {
         const { id } = req.params;
         const {
             type, model, building, location, ipAddress, login, password,
-            wifiName, wifiPassword, notes
+            wifiName, wifiPassword, notes, status: reqStatus
         } = req.body;
 
         if (!type || !model || !building || !location || !ipAddress) {
@@ -573,7 +654,14 @@ app.put('/api/network-devices/:id', checkDB, async (req, res) => {
             });
         }
 
-        const status = getStatusFromNotes(notes);
+        const status = reqStatus || getStatusFromNotes(notes);
+
+        if (ipAddress) {
+            const inUse = await isIPInUse(ipAddress, 'network_devices', id);
+            if (inUse) {
+                return res.status(400).json({ error: 'IP-адрес уже используется другим устройством' });
+            }
+        }
 
         const connection = await pool.getConnection();
         await connection.execute(
@@ -585,6 +673,8 @@ app.put('/api/network-devices/:id', checkDB, async (req, res) => {
              wifiName || null, wifiPassword || null, notes || null, status, id]
         );
         connection.release();
+
+        await addHistory('network_devices', id, 'update', JSON.stringify(req.body));
 
         res.json({ message: 'Сетевое устройство обновлено успешно' });
     } catch (error) {
@@ -599,6 +689,8 @@ app.delete('/api/network-devices/:id', checkDB, async (req, res) => {
         const connection = await pool.getConnection();
         await connection.execute('DELETE FROM network_devices WHERE id = ?', [id]);
         connection.release();
+
+        await addHistory('network_devices', id, 'delete');
 
         res.json({ message: 'Сетевое устройство удалено успешно' });
     } catch (error) {
@@ -637,7 +729,7 @@ app.get('/api/other-devices', checkDB, async (req, res) => {
 app.post('/api/other-devices', checkDB, async (req, res) => {
     try {
         const {
-            type, model, building, location, responsible, inventoryNumber, notes
+            type, model, building, location, responsible, inventoryNumber, notes, status: reqStatus
         } = req.body;
 
         // Валидация обязательных полей
@@ -647,7 +739,7 @@ app.post('/api/other-devices', checkDB, async (req, res) => {
             });
         }
 
-        const status = getStatusFromNotes(notes);
+        const status = reqStatus || getStatusFromNotes(notes);
 
         const connection = await pool.getConnection();
         const [result] = await connection.execute(
@@ -657,6 +749,8 @@ app.post('/api/other-devices', checkDB, async (req, res) => {
             [type, model, building, location, responsible || null, inventoryNumber || null, notes || null, status]
         );
         connection.release();
+
+        await addHistory('other_devices', result.insertId, 'create', JSON.stringify(req.body));
 
         res.json({ id: result.insertId, message: 'Устройство добавлено успешно' });
     } catch (error) {
@@ -669,7 +763,7 @@ app.put('/api/other-devices/:id', checkDB, async (req, res) => {
     try {
         const { id } = req.params;
         const {
-            type, model, building, location, responsible, inventoryNumber, notes
+            type, model, building, location, responsible, inventoryNumber, notes, status: reqStatus
         } = req.body;
 
         if (!type || !model || !building || !location) {
@@ -678,7 +772,7 @@ app.put('/api/other-devices/:id', checkDB, async (req, res) => {
             });
         }
 
-        const status = getStatusFromNotes(notes);
+        const status = reqStatus || getStatusFromNotes(notes);
 
         const connection = await pool.getConnection();
         await connection.execute(
@@ -689,6 +783,8 @@ app.put('/api/other-devices/:id', checkDB, async (req, res) => {
             [type, model, building, location, responsible || null, inventoryNumber || null, notes || null, status, id]
         );
         connection.release();
+
+        await addHistory('other_devices', id, 'update', JSON.stringify(req.body));
 
         res.json({ message: 'Устройство обновлено успешно' });
     } catch (error) {
@@ -703,6 +799,8 @@ app.delete('/api/other-devices/:id', checkDB, async (req, res) => {
         const connection = await pool.getConnection();
         await connection.execute('DELETE FROM other_devices WHERE id = ?', [id]);
         connection.release();
+
+        await addHistory('other_devices', id, 'delete');
 
         res.json({ message: 'Устройство удалено успешно' });
     } catch (error) {
@@ -761,6 +859,8 @@ app.post('/api/assigned-devices', checkDB, async (req, res) => {
         );
         connection.release();
 
+        await addHistory('assigned_devices', result.insertId, 'create', JSON.stringify(req.body));
+
         res.json({ id: result.insertId, message: 'Устройство назначено успешно' });
     } catch (error) {
         console.error('Ошибка назначения устройства:', error);
@@ -792,6 +892,8 @@ app.put('/api/assigned-devices/:id', checkDB, async (req, res) => {
         );
         connection.release();
 
+        await addHistory('assigned_devices', id, 'update', JSON.stringify(req.body));
+
         res.json({ message: 'Назначение обновлено успешно' });
     } catch (error) {
         console.error('Ошибка обновления назначения:', error);
@@ -806,10 +908,35 @@ app.delete('/api/assigned-devices/:id', checkDB, async (req, res) => {
         await connection.execute('DELETE FROM assigned_devices WHERE id = ?', [id]);
         connection.release();
 
+        await addHistory('assigned_devices', id, 'delete');
+
         res.json({ message: 'Назначение удалено успешно' });
     } catch (error) {
         console.error('Ошибка удаления назначения:', error);
         res.status(500).json({ error: 'Ошибка удаления назначения' });
+    }
+});
+
+// === ИСТОРИЯ ИЗМЕНЕНИЙ ===
+app.get('/api/history', checkDB, async (req, res) => {
+    try {
+        const connection = await pool.getConnection();
+        const [rows] = await connection.execute('SELECT * FROM device_history ORDER BY id DESC LIMIT 100');
+        connection.release();
+
+        const history = rows.map(r => ({
+            id: r.id,
+            table: r.device_table,
+            deviceId: r.device_id,
+            action: r.action,
+            details: r.details,
+            timestamp: r.timestamp
+        }));
+
+        res.json(history);
+    } catch (error) {
+        console.error('Ошибка получения истории:', error);
+        res.status(500).json({ error: 'Ошибка получения истории' });
     }
 });
 

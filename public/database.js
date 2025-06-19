@@ -11,7 +11,8 @@ class Database {
             searchInventory: '/api/search-inventory',
             importExcel: '/api/import-excel',
             importedComputers: '/api/imported-computers',
-            migrateImported: '/api/migrate-imported'
+            migrateImported: '/api/migrate-imported',
+            history: '/api/history'
         };
     }
 
@@ -72,6 +73,15 @@ class Database {
         } catch (error) {
             console.error('Ошибка миграции данных:', error);
             throw error;
+        }
+    }
+
+    async getHistory() {
+        try {
+            return await this.apiRequest(this.endpoints.history);
+        } catch (error) {
+            console.error('Ошибка получения истории:', error);
+            return [];
         }
     }
 
