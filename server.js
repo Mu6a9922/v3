@@ -497,9 +497,7 @@ app.post('/api/computers', checkDB, async (req, res) => {
         );
         connection.release();
 
-
         await addHistory('computers', result.insertId, 'create', null, req.body);
-
 
         res.json({ id: result.insertId, message: 'Компьютер добавлен успешно' });
     } catch (error) {
@@ -641,7 +639,6 @@ app.post('/api/network-devices', checkDB, async (req, res) => {
         connection.release();
 
         await addHistory('network_devices', result.insertId, 'create', null, req.body);
-
 
         res.json({ id: result.insertId, message: 'Сетевое устройство добавлено успешно' });
     } catch (error) {

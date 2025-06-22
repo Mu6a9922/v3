@@ -7,6 +7,7 @@ let editingId = null;
 let currentEditingType = null;
 let currentSortField = null;
 let currentSortDirection = 'asc';
+let assignmentMap = new Map();
 
 // Проверка зависимостей
 function checkDependencies() {
@@ -72,6 +73,27 @@ async function updateStats() {
         document.getElementById('totalNetwork').textContent = '0';
         document.getElementById('totalOther').textContent = '0';
         document.getElementById('totalAssigned').textContent = '0';
+    }
+}
+
+async function updateAssignmentMap() {
+    try {
+        const assignments = await db.getByType('assignedDevices');
+        assignmentMap = new Map();
+        assignments.forEach(a => {
+            const devs = Array.isArray(a.devices) ? a.devices : [a.devices];
+            devs.forEach(d => {
+                const match = d && d.match(/\(([^)]+)\)/);
+                const inv = match ? match[1] : null;
+                if (inv) {
+                    const existing = assignmentMap.get(inv) || [];
+                    assignmentMap.set(inv, [...existing, a.employee].join(', '));
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки назначений:', error);
+        assignmentMap = new Map();
     }
 }
 
@@ -159,7 +181,7 @@ function renderComputerTable(data = []) {
     tbody.innerHTML = '';
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
         return;
     }
 
@@ -179,6 +201,7 @@ function renderComputerTable(data = []) {
                 <td>${escapeHtml(computer.ram || '')}</td>
                 <td>${escapeHtml(computer.ipAddress || '')}</td>
                 <td>${escapeHtml(computer.computerName || '')}</td>
+                <td>${escapeHtml(computer.assignedTo || '')}</td>
                 <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                 <td>
                     <button class="btn" onclick="editComputer(${computer.id})" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>
@@ -199,6 +222,10 @@ async function filterComputers() {
         const statusFilter = document.getElementById('statusFilter')?.value || '';
 
         let computers = await db.getByType('computers');
+        await updateAssignmentMap();
+        computers.forEach(c => {
+            c.assignedTo = assignmentMap.get(c.inventoryNumber) || '';
+        });
 
         // Поиск
         if (searchTerm) {
@@ -292,8 +319,6 @@ async function editComputer(id) {
         document.getElementById('computerName').value = computer.computerName || '';
         document.getElementById('computerYear').value = computer.year || '';
         document.getElementById('computerNotes').value = computer.notes || '';
-        document.getElementById('computerStatus').value = computer.status || 'working';
-
         document.getElementById('computerStatus').value = computer.status || 'working';
 
 
@@ -416,7 +441,6 @@ function openNetworkModal() {
         if (form) {
             form.reset();
         }
-
         document.getElementById('networkStatus').value = 'working';
 
         
@@ -454,8 +478,6 @@ async function editNetworkDevice(id) {
         document.getElementById('networkWifiName').value = device.wifiName || '';
         document.getElementById('networkWifiPassword').value = device.wifiPassword || '';
         document.getElementById('networkNotes').value = device.notes || '';
-        document.getElementById('networkStatus').value = device.status || 'working';
-
         document.getElementById('networkStatus').value = device.status || 'working';
 
 
@@ -496,7 +518,7 @@ function renderOtherTable(data = []) {
     tbody.innerHTML = '';
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
         return;
     }
 
@@ -513,6 +535,7 @@ function renderOtherTable(data = []) {
                 <td>${escapeHtml(device.location || '')}</td>
                 <td>${escapeHtml(device.responsible || '')}</td>
                 <td>${escapeHtml(device.inventoryNumber || '')}</td>
+                <td>${escapeHtml(device.assignedTo || '')}</td>
                 <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                 <td>
                     <button class="btn" onclick="editOtherDevice(${device.id})" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>
@@ -532,6 +555,10 @@ async function filterOtherDevices() {
         const typeFilter = document.getElementById('otherTypeFilter')?.value || '';
 
         let devices = await db.getByType('otherDevices');
+        await updateAssignmentMap();
+        devices.forEach(d => {
+            d.assignedTo = assignmentMap.get(d.inventoryNumber) || '';
+        });
 
         // Поиск
         if (searchTerm) {
@@ -577,7 +604,6 @@ function openOtherModal() {
         if (form) {
             form.reset();
         }
-
         document.getElementById('otherStatus').value = 'working';
 
         
@@ -612,8 +638,6 @@ async function editOtherDevice(id) {
         document.getElementById('otherResponsible').value = device.responsible || '';
         document.getElementById('otherInventoryNumber').value = device.inventoryNumber || '';
         document.getElementById('otherNotes').value = device.notes || '';
-        document.getElementById('otherStatus').value = device.status || 'working';
-
         document.getElementById('otherStatus').value = device.status || 'working';
 
 
@@ -789,6 +813,9 @@ async function deleteAssignment(id) {
             await db.delete('assignedDevices', id);
             NotificationManager.success('Назначение успешно удалено');
             await filterAssignedDevices();
+            await updateAssignmentMap();
+            await filterComputers();
+            await filterOtherDevices();
             await updateStats();
         } catch (error) {
             console.error('Ошибка удаления назначения:', error);
@@ -1204,6 +1231,56 @@ async function renderHistory() {
     }
 }
 
+// === ИСТОРИЯ ИЗМЕНЕНИЙ ===
+async function renderHistory() {
+    console.log('📜 Загрузка истории изменений');
+
+    try {
+        const history = await db.getHistory();
+        const tbody = document.getElementById('historyTable');
+        if (!tbody) {
+            console.error('❌ Элемент historyTable не найден');
+            return;
+        }
+
+        tbody.innerHTML = '';
+        const actionMap = { create: 'добавлено', update: 'изменено', delete: 'удалено' };
+        const tableMap = {
+            computers: 'Компьютеры',
+            network_devices: 'Сетевое оборудование',
+            other_devices: 'Другая техника',
+            assigned_devices: 'Персональные устройства'
+        };
+
+        function formatDetails(details) {
+            if (!details) return '';
+            const before = details.before ? JSON.stringify(details.before) : '';
+            const after = details.after ? JSON.stringify(details.after) : '';
+            if (before && after) return `до: ${before}\nпосле: ${after}`;
+            return before || after;
+        }
+
+        history.forEach((item, index) => {
+            const action = actionMap[item.action] || item.action;
+            const table = tableMap[item.table] || item.table;
+            const detailsText = formatDetails(item.details);
+            tbody.innerHTML += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(table)}</td>
+                    <td>${escapeHtml(item.inventoryNumber || '')}</td>
+                    <td>${escapeHtml(item.name || '')}</td>
+                    <td>${escapeHtml(action)}</td>
+                    <td style="white-space: pre-wrap">${escapeHtml(detailsText)}</td>
+                    <td>${new Date(item.timestamp).toLocaleString()}</td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки истории:', error);
+    }
+}
+
 // === ОБРАБОТЧИКИ ФОРМ ===
 
 // Добавляем обработку формы компьютеров
@@ -1227,7 +1304,6 @@ async function handleComputerSubmit(e) {
             computerName: document.getElementById('computerName').value.trim(),
             year: document.getElementById('computerYear').value.trim(),
             notes: document.getElementById('computerNotes').value.trim(),
-
             status: document.getElementById('computerStatus').value
 
         };
@@ -1342,7 +1418,6 @@ async function handleOtherSubmit(e) {
             responsible: document.getElementById('otherResponsible').value.trim(),
             inventoryNumber: document.getElementById('otherInventoryNumber').value.trim(),
             notes: document.getElementById('otherNotes').value.trim(),
-
             status: document.getElementById('otherStatus').value
 
         };
@@ -1416,6 +1491,9 @@ async function handleAssignedSubmit(e) {
         }
 
         await filterAssignedDevices();
+        await updateAssignmentMap();
+        await filterComputers();
+        await filterOtherDevices();
         await updateStats();
         closeModal('assignedModal');
     } catch (error) {
