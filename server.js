@@ -123,7 +123,7 @@ async function initDatabase() {
         await connection.execute(`
             CREATE TABLE IF NOT EXISTS other_devices (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                type ENUM('принтер', 'проектор', 'монитор', 'сканер', 'другое') NOT NULL,
+                type ENUM('принтер', 'проектор', 'монитор', 'МФУ', 'другое') NOT NULL,
                 model VARCHAR(255) NOT NULL,
                 building ENUM('главный', 'медицинский') NOT NULL,
                 location VARCHAR(255) NOT NULL,
