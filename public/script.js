@@ -292,6 +292,7 @@ async function editComputer(id) {
         document.getElementById('computerName').value = computer.computerName || '';
         document.getElementById('computerYear').value = computer.year || '';
         document.getElementById('computerNotes').value = computer.notes || '';
+        document.getElementById('computerStatus').value = computer.status || 'working';
 
         document.getElementById('computerStatus').value = computer.status || 'working';
 
@@ -453,6 +454,7 @@ async function editNetworkDevice(id) {
         document.getElementById('networkWifiName').value = device.wifiName || '';
         document.getElementById('networkWifiPassword').value = device.wifiPassword || '';
         document.getElementById('networkNotes').value = device.notes || '';
+        document.getElementById('networkStatus').value = device.status || 'working';
 
         document.getElementById('networkStatus').value = device.status || 'working';
 
@@ -610,6 +612,7 @@ async function editOtherDevice(id) {
         document.getElementById('otherResponsible').value = device.responsible || '';
         document.getElementById('otherInventoryNumber').value = device.inventoryNumber || '';
         document.getElementById('otherNotes').value = device.notes || '';
+        document.getElementById('otherStatus').value = device.status || 'working';
 
         document.getElementById('otherStatus').value = device.status || 'working';
 
@@ -666,11 +669,11 @@ function renderAssignedTable(data = []) {
                 <td><strong>${escapeHtml(assignment.employee || '')}</strong></td>
                 <td>${escapeHtml(assignment.position || '')}</td>
                 <td>${escapeHtml(assignment.building || '')}</td>
-                <td style="max-width: 300px; word-wrap: break-word;">${escapeHtml(devicesText)}</td>
+                <td class="wrap-cell" style="max-width: 300px;">${escapeHtml(devicesText)}</td>
                 <td>${DateUtils ? DateUtils.formatDate(assignment.assignedDate) : assignment.assignedDate || ''}</td>
                 <td>
                     <button class="btn" onclick="editAssignment(${assignment.id})" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>
-                    <button class="btn btn-danger" onclick="deleteAssignment(${assignment.id})" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;" title="Удалить">🗑️</button>
+                <button class="btn btn-danger" onclick="deleteAssignment(${assignment.id})" style="font-size: 12px; padding: 5px 10px; margin-left: 5px;" title="Удалить">🗑️</button>
                 </td>
             </tr>
         `;
@@ -1151,6 +1154,56 @@ async function renderHistory() {
     }
 }
 
+// === ИСТОРИЯ ИЗМЕНЕНИЙ ===
+async function renderHistory() {
+    console.log('📜 Загрузка истории изменений');
+
+    try {
+        const history = await db.getHistory();
+        const tbody = document.getElementById('historyTable');
+        if (!tbody) {
+            console.error('❌ Элемент historyTable не найден');
+            return;
+        }
+
+        tbody.innerHTML = '';
+        const actionMap = { create: 'добавлено', update: 'изменено', delete: 'удалено' };
+        const tableMap = {
+            computers: 'Компьютеры',
+            network_devices: 'Сетевое оборудование',
+            other_devices: 'Другая техника',
+            assigned_devices: 'Персональные устройства'
+        };
+
+        function formatDetails(details) {
+            if (!details) return '';
+            const before = details.before ? JSON.stringify(details.before) : '';
+            const after = details.after ? JSON.stringify(details.after) : '';
+            if (before && after) return `до: ${before}\nпосле: ${after}`;
+            return before || after;
+        }
+
+        history.forEach((item, index) => {
+            const action = actionMap[item.action] || item.action;
+            const table = tableMap[item.table] || item.table;
+            const detailsText = formatDetails(item.details);
+            tbody.innerHTML += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(table)}</td>
+                    <td>${escapeHtml(item.inventoryNumber || '')}</td>
+                    <td>${escapeHtml(item.name || '')}</td>
+                    <td>${escapeHtml(action)}</td>
+                    <td style="white-space: pre-wrap">${escapeHtml(detailsText)}</td>
+                    <td>${new Date(item.timestamp).toLocaleString()}</td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки истории:', error);
+    }
+}
+
 // === ОБРАБОТЧИКИ ФОРМ ===
 
 // Добавляем обработку формы компьютеров
@@ -1431,11 +1484,20 @@ async function migrateImportedData() {
 async function exportData(type) {
     console.log('📊 Экспорт данных типа:', type);
     NotificationManager.info(`Экспорт данных: ${type}`);
-    
+
     try {
-        // Простой экспорт в JSON
-        const data = await db.getByType(type === 'computers' ? 'computers' : type);
-        
+        let data;
+        switch (type) {
+            case 'ipaddresses':
+                data = await getIPData();
+                break;
+            case 'history':
+                data = await db.getHistory();
+                break;
+            default:
+                data = await db.getByType(type === 'computers' ? 'computers' : type);
+        }
+
         const filename = `${type}_${new Date().toISOString().split('T')[0]}.json`;
         const dataStr = JSON.stringify(data, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -1445,7 +1507,7 @@ async function exportData(type) {
         link.download = filename;
         link.click();
         URL.revokeObjectURL(url);
-        
+
         NotificationManager.success(`Данные экспортированы: ${filename}`);
     } catch (error) {
         console.error('Ошибка экспорта:', error);
@@ -1455,7 +1517,109 @@ async function exportData(type) {
 
 async function exportToExcel(type) {
     console.log('📤 Экспорт в Excel типа:', type);
-    NotificationManager.info(`Экспорт в Excel: ${type} (функция в разработке)`);
+    NotificationManager.info(`Экспорт в Excel: ${type}`);
+
+    try {
+        let rows;
+        switch (type) {
+            case 'ipaddresses':
+                rows = await buildIPExcelData();
+                break;
+            case 'history':
+                rows = await buildHistoryExcelData();
+                break;
+            default:
+                rows = await db.exportToExcel(
+                    type === 'computers' ? 'computers'
+                    : type === 'network' ? 'networkDevices'
+                    : type === 'other' ? 'otherDevices'
+                    : type === 'assigned' ? 'assignedDevices'
+                    : type
+                );
+        }
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Data');
+        const filename = `${type}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, filename);
+        NotificationManager.success(`Данные экспортированы: ${filename}`);
+    } catch (error) {
+        console.error('Ошибка экспорта Excel:', error);
+        NotificationManager.error('Ошибка экспорта в Excel');
+    }
+}
+
+async function getIPData() {
+    const [computers, networkDevices] = await Promise.all([
+        db.getByType('computers'),
+        db.getByType('networkDevices')
+    ]);
+
+    const usedIPs = new Map();
+    computers.forEach(c => {
+        if (c.ipAddress && c.ipAddress.startsWith('192.168.100.')) {
+            usedIPs.set(c.ipAddress, {
+                type: c.deviceType || 'Компьютер',
+                name: c.computerName || c.model || 'Неизвестно',
+                location: c.location || '',
+                status: c.status || 'working'
+            });
+        }
+    });
+    networkDevices.forEach(d => {
+        if (d.ipAddress && d.ipAddress.startsWith('192.168.100.')) {
+            usedIPs.set(d.ipAddress, {
+                type: d.type || 'Сетевое устройство',
+                name: d.model || 'Неизвестно',
+                location: d.location || '',
+                status: d.status || 'working'
+            });
+        }
+    });
+
+    const list = [];
+    for (let i = 1; i <= 254; i++) {
+        const ip = `192.168.100.${i}`;
+        const device = usedIPs.get(ip);
+        list.push({
+            index: i,
+            ip,
+            type: device ? device.type : '',
+            name: device ? device.name : 'Свободен',
+            location: device ? device.location : '',
+            status: device ? device.status : 'free'
+        });
+    }
+    return list;
+}
+
+async function buildIPExcelData() {
+    const data = await getIPData();
+    const headers = ['№', 'IP адрес', 'Тип устройства', 'Устройство', 'Расположение', 'Статус'];
+    const rows = data.map(d => [d.index, d.ip, d.type, d.name, d.location, d.status]);
+    return [headers, ...rows];
+}
+
+async function buildHistoryExcelData() {
+    const history = await db.getHistory();
+    const headers = ['№', 'Таблица', 'Инв.номер', 'Название', 'Действие', 'Детали', 'Время'];
+    const actionMap = { create: 'добавлено', update: 'изменено', delete: 'удалено' };
+    const tableMap = {
+        computers: 'Компьютеры',
+        network_devices: 'Сетевое оборудование',
+        other_devices: 'Другая техника',
+        assigned_devices: 'Персональные устройства'
+    };
+
+    const rows = history.map((item, idx) => {
+        const action = actionMap[item.action] || item.action;
+        const table = tableMap[item.table] || item.table;
+        const details = JSON.stringify(item.details || {});
+        return [idx + 1, table, item.inventoryNumber || '', item.name || '', action, details, new Date(item.timestamp).toLocaleString()];
+    });
+
+    return [headers, ...rows];
 }
 
 async function importComputers(event) {

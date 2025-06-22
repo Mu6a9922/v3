@@ -547,7 +547,6 @@ app.put('/api/computers/:id', checkDB, async (req, res) => {
         );
         connection.release();
 
-
         await addHistory('computers', id, 'update', oldRows[0] || null, req.body);
 
 
@@ -641,7 +640,6 @@ app.post('/api/network-devices', checkDB, async (req, res) => {
         );
         connection.release();
 
-
         await addHistory('network_devices', result.insertId, 'create', null, req.body);
 
 
@@ -687,7 +685,6 @@ app.put('/api/network-devices/:id', checkDB, async (req, res) => {
         );
         connection.release();
 
-
         await addHistory('network_devices', id, 'update', oldRows[0] || null, req.body);
 
 
@@ -706,9 +703,7 @@ app.delete('/api/network-devices/:id', checkDB, async (req, res) => {
         await connection.execute('DELETE FROM network_devices WHERE id = ?', [id]);
         connection.release();
 
-
         await addHistory('network_devices', id, 'delete', oldRows[0] || null, null);
-
 
         res.json({ message: 'Сетевое устройство удалено успешно' });
     } catch (error) {
@@ -770,7 +765,6 @@ app.post('/api/other-devices', checkDB, async (req, res) => {
 
         await addHistory('other_devices', result.insertId, 'create', null, req.body);
 
-
         res.json({ id: result.insertId, message: 'Устройство добавлено успешно' });
     } catch (error) {
         console.error('Ошибка добавления устройства:', error);
@@ -806,7 +800,6 @@ app.put('/api/other-devices/:id', checkDB, async (req, res) => {
 
         await addHistory('other_devices', id, 'update', oldRows[0] || null, req.body);
 
-
         res.json({ message: 'Устройство обновлено успешно' });
     } catch (error) {
         console.error('Ошибка обновления устройства:', error);
@@ -822,9 +815,7 @@ app.delete('/api/other-devices/:id', checkDB, async (req, res) => {
         await connection.execute('DELETE FROM other_devices WHERE id = ?', [id]);
         connection.release();
 
-
         await addHistory('other_devices', id, 'delete', oldRows[0] || null, null);
-
 
         res.json({ message: 'Устройство удалено успешно' });
     } catch (error) {
@@ -883,9 +874,7 @@ app.post('/api/assigned-devices', checkDB, async (req, res) => {
         );
         connection.release();
 
-
         await addHistory('assigned_devices', result.insertId, 'create', null, req.body);
-
 
         res.json({ id: result.insertId, message: 'Устройство назначено успешно' });
     } catch (error) {
@@ -919,9 +908,7 @@ app.put('/api/assigned-devices/:id', checkDB, async (req, res) => {
         );
         connection.release();
 
-
         await addHistory('assigned_devices', id, 'update', oldRows[0] || null, req.body);
-
 
         res.json({ message: 'Назначение обновлено успешно' });
     } catch (error) {
@@ -938,9 +925,7 @@ app.delete('/api/assigned-devices/:id', checkDB, async (req, res) => {
         await connection.execute('DELETE FROM assigned_devices WHERE id = ?', [id]);
         connection.release();
 
-
         await addHistory('assigned_devices', id, 'delete', oldRows[0] || null, null);
-
 
         res.json({ message: 'Назначение удалено успешно' });
     } catch (error) {
@@ -955,7 +940,6 @@ app.get('/api/history', checkDB, async (req, res) => {
         const connection = await pool.getConnection();
         const [rows] = await connection.execute('SELECT * FROM device_history ORDER BY id DESC LIMIT 100');
         connection.release();
-
 
         const history = rows.map(r => {
             let detailsObj = {};
@@ -980,7 +964,6 @@ app.get('/api/history', checkDB, async (req, res) => {
                 timestamp: r.timestamp
             };
         });
-
 
         res.json(history);
     } catch (error) {

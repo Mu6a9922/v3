@@ -228,6 +228,10 @@
             <div class="controls">
                 <h3>📊 Таблица IP адресов сети 192.168.100.0/24</h3>
                 <p>Управление IP адресами от 192.168.100.1 до 192.168.100.254</p>
+                <div class="file-operations">
+                    <button class="btn btn-warning" onclick="exportToExcel('ipaddresses')">📤 Экспорт Excel</button>
+                    <button class="btn" onclick="exportData('ipaddresses')">📊 Экспорт JSON</button>
+                </div>
             </div>
 
             <div class="table-container">
@@ -253,6 +257,12 @@
         <div id="history" class="tab-content">
             <div class="controls">
                 <h3>🕘 История изменений</h3>
+
+                <div class="file-operations">
+                    <button class="btn btn-warning" onclick="exportToExcel('history')">📤 Экспорт Excel</button>
+                    <button class="btn" onclick="exportData('history')">📊 Экспорт JSON</button>
+                </div>
+
             </div>
 
             <div class="table-container">
@@ -374,7 +384,7 @@
                         <option value="issues">С проблемами</option>
                         <option value="broken">Не исправен</option>
                     </select>
-                    
+
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn btn-success">💾 Сохранить</button>
