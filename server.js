@@ -123,7 +123,7 @@ async function initDatabase() {
         await connection.execute(`
             CREATE TABLE IF NOT EXISTS other_devices (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                type ENUM('принтер', 'проектор', 'монитор', 'сканер', 'другое') NOT NULL,
+                type ENUM('принтер', 'проектор', 'монитор', 'МФУ', 'другое') NOT NULL,
                 model VARCHAR(255) NOT NULL,
                 building ENUM('главный', 'медицинский') NOT NULL,
                 location VARCHAR(255) NOT NULL,
@@ -247,11 +247,13 @@ async function isIPInUse(ip, excludeTable = null, excludeId = null) {
 }
 
 // Добавление записи в историю изменений
+
 async function addHistory(table, id, action, beforeData = null, afterData = null) {
     if (!pool) return;
     try {
         const connection = await pool.getConnection();
         const details = JSON.stringify({ before: beforeData, after: afterData });
+
         await connection.execute(
             'INSERT INTO device_history (device_table, device_id, action, details) VALUES (?, ?, ?, ?)',
             [table, id, action, details]
@@ -545,6 +547,7 @@ app.put('/api/computers/:id', checkDB, async (req, res) => {
 
         await addHistory('computers', id, 'update', oldRows[0] || null, req.body);
 
+
         res.json({ message: 'Компьютер обновлен успешно' });
     } catch (error) {
         console.error('Ошибка обновления компьютера:', error);
@@ -562,6 +565,7 @@ app.delete('/api/computers/:id', checkDB, async (req, res) => {
         connection.release();
 
         await addHistory('computers', id, 'delete', oldRows[0] || null, null);
+
 
         res.json({ message: 'Компьютер удален успешно' });
     } catch (error) {
@@ -679,6 +683,7 @@ app.put('/api/network-devices/:id', checkDB, async (req, res) => {
         connection.release();
 
         await addHistory('network_devices', id, 'update', oldRows[0] || null, req.body);
+
 
         res.json({ message: 'Сетевое устройство обновлено успешно' });
     } catch (error) {

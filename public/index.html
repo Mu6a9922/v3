@@ -158,7 +158,7 @@
                     <option value="принтер">Принтеры</option>
                     <option value="проектор">Проекторы</option>
                     <option value="монитор">Мониторы</option>
-                    <option value="сканер">Сканеры</option>
+                    <option value="МФУ">МФУ</option>
                     <option value="другое">Другое</option>
                 </select>
                 <div class="file-operations">
@@ -259,10 +259,12 @@
         <div id="history" class="tab-content">
             <div class="controls">
                 <h3>🕘 История изменений</h3>
+
                 <div class="file-operations">
                     <button class="btn btn-warning" onclick="exportToExcel('history')">📤 Экспорт Excel</button>
                     <button class="btn" onclick="exportData('history')">📊 Экспорт JSON</button>
                 </div>
+
             </div>
 
             <div class="table-container">
@@ -377,12 +379,14 @@
                     <textarea id="computerNotes" rows="3"></textarea>
                 </div>
                 <div class="form-group">
+
                     <label for="computerStatus">Состояние:</label>
                     <select id="computerStatus">
                         <option value="working">Исправен</option>
                         <option value="issues">С проблемами</option>
                         <option value="broken">Не исправен</option>
                     </select>
+
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn btn-success">💾 Сохранить</button>
@@ -458,12 +462,14 @@
                     <textarea id="networkNotes" rows="3"></textarea>
                 </div>
                 <div class="form-group">
+
                     <label for="networkStatus">Состояние:</label>
                     <select id="networkStatus">
                         <option value="working">Исправен</option>
                         <option value="issues">С проблемами</option>
                         <option value="broken">Не исправен</option>
                     </select>
+
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn btn-success">💾 Сохранить</button>
@@ -487,7 +493,7 @@
                             <option value="принтер">Принтер</option>
                             <option value="проектор">Проектор</option>
                             <option value="монитор">Монитор</option>
-                            <option value="сканер">Сканер</option>
+                            <option value="МФУ">МФУ</option>
                             <option value="другое">Другое</option>
                         </select>
                     </div>
@@ -525,12 +531,14 @@
                     <textarea id="otherNotes" rows="3"></textarea>
                 </div>
                 <div class="form-group">
+
                     <label for="otherStatus">Состояние:</label>
                     <select id="otherStatus">
                         <option value="working">Исправен</option>
                         <option value="issues">С проблемами</option>
                         <option value="broken">Не исправен</option>
                     </select>
+
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn btn-success">💾 Сохранить</button>
