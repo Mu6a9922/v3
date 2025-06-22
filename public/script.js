@@ -7,6 +7,7 @@ let editingId = null;
 let currentEditingType = null;
 let currentSortField = null;
 let currentSortDirection = 'asc';
+let assignmentMap = new Map();
 
 // Проверка зависимостей
 function checkDependencies() {
@@ -72,6 +73,27 @@ async function updateStats() {
         document.getElementById('totalNetwork').textContent = '0';
         document.getElementById('totalOther').textContent = '0';
         document.getElementById('totalAssigned').textContent = '0';
+    }
+}
+
+async function updateAssignmentMap() {
+    try {
+        const assignments = await db.getByType('assignedDevices');
+        assignmentMap = new Map();
+        assignments.forEach(a => {
+            const devs = Array.isArray(a.devices) ? a.devices : [a.devices];
+            devs.forEach(d => {
+                const match = d && d.match(/\(([^)]+)\)/);
+                const inv = match ? match[1] : null;
+                if (inv) {
+                    const existing = assignmentMap.get(inv) || [];
+                    assignmentMap.set(inv, [...existing, a.employee].join(', '));
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки назначений:', error);
+        assignmentMap = new Map();
     }
 }
 
@@ -159,7 +181,7 @@ function renderComputerTable(data = []) {
     tbody.innerHTML = '';
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
         return;
     }
 
@@ -179,6 +201,7 @@ function renderComputerTable(data = []) {
                 <td>${escapeHtml(computer.ram || '')}</td>
                 <td>${escapeHtml(computer.ipAddress || '')}</td>
                 <td>${escapeHtml(computer.computerName || '')}</td>
+                <td>${escapeHtml(computer.assignedTo || '')}</td>
                 <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                 <td>
                     <button class="btn" onclick="editComputer(${computer.id})" style="font-size: 12px; padding: 5px 10px;" title="Редактировать">✏️</button>
@@ -199,6 +222,10 @@ async function filterComputers() {
         const statusFilter = document.getElementById('statusFilter')?.value || '';
 
         let computers = await db.getByType('computers');
+        await updateAssignmentMap();
+        computers.forEach(c => {
+            c.assignedTo = assignmentMap.get(c.inventoryNumber) || '';
+        });
 
         // Поиск
         if (searchTerm) {
@@ -461,7 +488,12 @@ async function editNetworkDevice(id) {
 
         document.getElementById('networkModal').style.display = 'block';
     } catch (error) {
-        console.error('Ошибка редактирования сетевого устройства:', error);
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">Нет данных для отображения</td></tr>';
+                <td>${escapeHtml(device.assignedTo || '')}</td>
+        await updateAssignmentMap();
+        devices.forEach(d => {
+            d.assignedTo = assignmentMap.get(d.inventoryNumber) || '';
+        });
         NotificationManager.error('Ошибка при загрузке данных устройства');
     }
 }
@@ -749,6 +781,9 @@ async function editAssignment(id) {
     
     try {
         const assignments = await db.getByType('assignedDevices');
+            await updateAssignmentMap();
+            await filterComputers();
+            await filterOtherDevices();
         const assignment = assignments.find(a => a.id === id);
         
         if (!assignment) {
@@ -1154,6 +1189,9 @@ async function renderHistory() {
     }
 }
 
+        await updateAssignmentMap();
+        await filterComputers();
+        await filterOtherDevices();
 // === ИСТОРИЯ ИЗМЕНЕНИЙ ===
 async function renderHistory() {
     console.log('📜 Загрузка истории изменений');
